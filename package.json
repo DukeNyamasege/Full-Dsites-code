@@ -1,0 +1,16 @@
+{
+  "name": "reef-sites-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "deriv-sites-ui-kit-main",
+    "repo-push-new-user-interface",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace deriv-sites-ui-kit-main",
+    "build:admin": "npm run build --workspace deriv-sites-ui-kit-main",
+    "dev:trading-web": "npm run start --workspace trading-bot-template",
+    "build:trading-web": "npm run build --workspace trading-bot-template"
+  }
+}

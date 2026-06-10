@@ -1,0 +1,31 @@
+project_id = "tsidnkyizypwlxtkkoyd"
+
+[functions.check-domain]
+verify_jwt = false
+
+[functions.mpesa-stk-push]
+verify_jwt = false
+
+[functions.mpesa-callback]
+verify_jwt = false
+
+[functions.send-purchase-email]
+verify_jwt = false
+
+[functions.check-payment-status]
+verify_jwt = true
+
+[functions.get-domain-purchases]
+verify_jwt = false
+
+[functions.delete-failed-purchase]
+verify_jwt = false
+
+[functions.send-site-live-email]
+verify_jwt = true
+
+[functions.fetch-deriv-commissions]
+verify_jwt = true
+
+[functions.public-site-config]
+verify_jwt = false
