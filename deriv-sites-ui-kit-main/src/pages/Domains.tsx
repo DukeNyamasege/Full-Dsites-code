@@ -30,8 +30,7 @@ const Domains = () => {
     const { exists, site } = getDomainSiteStatus(purchaseId);
     
     if (exists && site) {
-      // Site exists, navigate to setup flow
-      navigate(`/setup/app-id?siteId=${site.id}&domain=${encodeURIComponent(domainName)}`);
+      navigate(`/sites/${site.id}/wizard`);
     } else {
       // Create a new site and navigate to setup
       if (!user) {
@@ -40,10 +39,22 @@ const Domains = () => {
       }
 
       try {
-        const { data: newSite, error } = await supabase
+        // Generated database types are refreshed only after the migration is applied.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = supabase as any;
+        const { data: memberships, error: membershipError } = await db.from('organisation_members').select('organisation_id').eq('user_id', user.id).eq('status', 'active').in('role', ['tenant_owner', 'tenant_developer']).limit(1);
+        if (membershipError) throw membershipError;
+        let organisationId = memberships?.[0]?.organisation_id;
+        if (!organisationId) {
+          const created = await db.rpc('create_personal_organisation', { _name: `${user.email?.split('@')[0] || 'My'} sites` });
+          if (created.error) throw created.error;
+          organisationId = created.data;
+        }
+        const { data: newSite, error } = await db
           .from('sites')
           .insert({
             user_id: user.id,
+            organisation_id: organisationId,
             domain_id: purchaseId,
             name: domainName,
             status: 'draft'
@@ -53,7 +64,7 @@ const Domains = () => {
 
         if (error) throw error;
         
-        navigate(`/setup/app-id?siteId=${newSite.id}&domain=${encodeURIComponent(domainName)}`);
+        navigate(`/sites/${newSite.id}/wizard`);
       } catch (err) {
         console.error('Error creating site:', err);
         toast.error('Failed to start setup');
@@ -146,7 +157,7 @@ const Domains = () => {
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>Configuration (0)</span>
+            <span>Configuration ({configuredSites.length})</span>
           </button>
         </div>
       </div>
@@ -387,7 +398,7 @@ const Domains = () => {
                       </p>
                     </div>
                     <Button
-                      onClick={() => navigate(`/sites/${site.id}/config`)}
+                      onClick={() => navigate(`/sites/${site.id}/wizard`)}
                       className="btn-primary h-9 px-4 text-sm"
                     >
                       <Settings className="w-4 h-4 mr-2" />

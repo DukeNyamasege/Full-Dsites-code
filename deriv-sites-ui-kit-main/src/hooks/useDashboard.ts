@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { startOfMonth, startOfDay, isWithinInterval } from "date-fns";
 
 export interface Site {
   id: string;
@@ -10,6 +9,8 @@ export interface Site {
   domain_id: string | null;
   deriv_affiliate_id: string | null;
   created_at: string;
+  configuration_status?: string;
+  active_configuration_version?: number | null;
   domain_purchases?: {
     domain_name: string;
   } | null;
@@ -23,23 +24,9 @@ export interface Subscription {
   end_date: string | null;
 }
 
-export interface Commission {
-  id: string;
-  amount: number;
-  commission_fee: number;
-  net_amount: number;
-  period_start: string;
-  period_end: string;
-  status: string;
-  site_id: string;
-  created_at: string;
-}
-
 export interface DashboardStats {
   totalSites: number;
   activeSites: number;
-  todayCommissions: number;
-  currentMonthCommissions: number;
 }
 
 export function useDashboard() {
@@ -54,7 +41,6 @@ export function useDashboard() {
           *,
           domain_purchases(domain_name)
         `)
-        .eq('user_id', user!.id)
         .neq('status', 'deleted')
         .order('created_at', { ascending: false });
 
@@ -80,48 +66,16 @@ export function useDashboard() {
     enabled: !!user,
   });
 
-  const { data: commissions, isLoading: commissionsLoading } = useQuery({
-    queryKey: ['commissions', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('commissions')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('period_end', { ascending: false });
-
-      if (error) throw error;
-      return data as Commission[];
-    },
-    enabled: !!user,
-  });
-
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const monthStart = startOfMonth(now);
-
-  const todayCommissions = commissions?.filter(c => {
-    const createdAt = new Date(c.created_at);
-    return createdAt >= todayStart;
-  }).reduce((sum, c) => sum + Number(c.net_amount), 0) ?? 0;
-
-  const currentMonthCommissions = commissions?.filter(c => {
-    const createdAt = new Date(c.created_at);
-    return createdAt >= monthStart;
-  }).reduce((sum, c) => sum + Number(c.net_amount), 0) ?? 0;
-
   const stats: DashboardStats = {
     totalSites: sites?.length ?? 0,
     activeSites: sites?.filter(s => s.status === 'active').length ?? 0,
-    todayCommissions,
-    currentMonthCommissions,
   };
 
   return {
     sites: sites ?? [],
     subscription,
-    commissions: commissions ?? [],
     stats,
-    isLoading: sitesLoading || subscriptionLoading || commissionsLoading,
+    isLoading: sitesLoading || subscriptionLoading,
     refetch: refetchSites,
   };
 }

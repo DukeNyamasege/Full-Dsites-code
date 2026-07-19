@@ -1,76 +1,35 @@
-# Reef Sites Workspace
+# Reef Sites
 
-This workspace now has a lightweight monorepo foundation for the two existing applications:
+Reef Sites is a multi-tenant control plane for configuring and deploying many Deriv-powered trading websites from one shared GitHub repository. It contains:
 
-- `deriv-sites-ui-kit-main` - Reef Sites admin/control-panel app
-- `repo-push-new-user-interface` - client-facing trading website template
+- `deriv-sites-ui-kit-main`: owner and staff site manager (React/Vite/Supabase).
+- `new-user-interface-main`: generated trading-site runtime (React/RSBuild/Blockly).
+- `packages/*`: shared contracts for scopes, templates, features, runtime config, and deployment providers.
+- `deriv-sites-ui-kit-main/supabase`: database migrations and server-side integrations.
 
-## Current status
+The generated runtime never receives a Deriv bearer or refresh token. OAuth state, PKCE, token exchange/refresh, account calls, and OTP requests run in Supabase Edge Functions. Each deployed site reaches those functions through its same-origin `/api` Netlify proxy and receives only an opaque HttpOnly session cookie.
 
-The apps have **not** been physically moved yet. That is intentional for safety in this first phase.
+## Local commands
 
-Why:
-
-- both apps already have their own working tooling assumptions
-- the trading app includes its own repo/tooling structure
-- moving folders now would create avoidable risk before shared packages and runtime config are introduced
-
-## Planned target structure
-
-The intended target architecture is:
-
-```text
-workspace/
-  apps/
-    admin/
-    trading-web/
-  packages/
-    shared-types/
-    site-config-schema/
-    deriv-auth/
-  supabase/
-    migrations/
-    functions/
-```
-
-## Safe first move completed
-
-This workspace now provides:
-
-- a root npm workspace configuration
-- placeholder shared package folders
-- an initial `site-config-schema` package for future shared runtime config typing
-
-## Current app mapping
-
-Planned mapping for a later refactor:
-
-- `deriv-sites-ui-kit-main` -> `apps/admin`
-- `repo-push-new-user-interface` -> `apps/trading-web`
-
-## Running the apps today
-
-From the workspace root:
+Use Node 20.
 
 ```bash
+npm install --ignore-scripts
 npm run dev:admin
 npm run dev:trading-web
+npm run build:admin
+npm run build:trading-web
 ```
 
-Or run them directly in their current folders:
+The admin app defaults to Vite port 8080; the trading runtime defaults to port 5000. Local Supabase Edge Functions are expected at `127.0.0.1:54321` when testing the complete auth flow.
 
-```bash
-cd deriv-sites-ui-kit-main
-npm run dev
-```
+## Production workflow
 
-```bash
-cd repo-push-new-user-interface
-npm run start
-```
+1. An owner creates a tenant-owned site and completes the resumable 10-step wizard.
+2. Feature selection produces the minimum Deriv scope set.
+3. Publishing creates an atomic GitHub App commit under `sites/<site-id>/`.
+4. Netlify detects the commit and only builds the affected site.
+5. Signed webhooks update deployment/domain state and perform a health check.
+6. Owners and authorized staff see deployment history, real Deriv markup, and audit-backed errors.
 
-## Notes
-
-- The trading app still uses its existing hardcoded domain configuration.
-- No trading logic, OAuth logic, or Supabase schema was changed in this phase.
-- The shared packages are placeholders only and are not connected to either app yet.
+Start with [architecture](docs/ARCHITECTURE.md), [production setup](docs/SETUP_AND_OPERATIONS.md), [audit](docs/PLATFORM_AUDIT_2026-07-19.md), and [cleanup report](docs/CLEANUP_REPORT.md).

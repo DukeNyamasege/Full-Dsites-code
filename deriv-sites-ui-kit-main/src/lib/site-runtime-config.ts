@@ -16,6 +16,11 @@ export type SitePageRow = Tables<"site_pages">;
 export type SiteDerivAppRow = Tables<"site_deriv_apps">;
 export type SiteBotsManifestRow = Tables<"site_bots_manifest">;
 export type SitePublishVersionRow = Tables<"site_publish_versions">;
+export type SiteDeploymentRow = Tables<"site_deployments">;
+export type ToolRow = Tables<"tools">;
+export type SiteToolRow = Tables<"site_tools">;
+export type SiteIntegrationRow = Tables<"site_integrations">;
+export type SiteToolWithTool = SiteToolRow & { tool: ToolRow };
 export type XmlBotRow = Tables<"xml_bots">;
 export type SiteRow = Tables<"sites">;
 
@@ -440,4 +445,101 @@ export async function createAndPublishSiteConfigSnapshot(siteId: string, publish
 
 export async function createSitePublishVersion(siteId: string, publishedBy?: string | null) {
   return createAndPublishSiteConfigSnapshot(siteId, publishedBy);
+}
+
+export async function getSiteDeployments(siteId: string): Promise<SiteDeploymentRow[]> {
+  const { data, error } = await supabase
+    .from("site_deployments")
+    .select("*")
+    .eq("site_id", siteId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function getSiteTools(siteId: string): Promise<{ catalogue: ToolRow[]; installed: SiteToolWithTool[] }> {
+  const [catalogueResult, installedResult] = await Promise.all([
+    supabase.from("tools").select("*").eq("status", "active").order("category").order("name"),
+    supabase.from("site_tools").select("*, tool:tools(*)").eq("site_id", siteId).order("display_order"),
+  ]);
+  if (catalogueResult.error) throw new Error(catalogueResult.error.message);
+  if (installedResult.error) throw new Error(installedResult.error.message);
+  return {
+    catalogue: catalogueResult.data || [],
+    installed: (installedResult.data || []) as unknown as SiteToolWithTool[],
+  };
+}
+
+export async function setSiteTool(siteId: string, tool: ToolRow, enabled: boolean, displayOrder: number) {
+  const { data, error } = await supabase.from("site_tools").upsert({
+    site_id: siteId,
+    tool_id: tool.id,
+    enabled,
+    version: tool.current_version,
+    display_order: displayOrder,
+    settings_json: tool.default_settings,
+  }, { onConflict: "site_id,tool_id" }).select("*, tool:tools(*)").single();
+  if (error) throw new Error(error.message);
+  return data as unknown as SiteToolWithTool;
+}
+
+export async function getSiteIntegration(siteId: string): Promise<SiteIntegrationRow | null> {
+  const { data, error } = await supabase.from("site_integrations").select("*").eq("site_id", siteId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function provisionSite(siteId: string): Promise<SiteIntegrationRow> {
+  const { data, error } = await supabase.functions.invoke<{ integration: SiteIntegrationRow }>("provision-site-netlify", {
+    body: { siteId },
+  });
+  if (error) throw new Error(error.message);
+  if (!data?.integration) throw new Error("Provisioning returned no integration");
+  return data.integration;
+}
+
+export async function retryDeployment(deploymentId: string): Promise<GitHubPublishResult> {
+  const { data, error } = await supabase.functions.invoke<GitHubPublishResult>("publish-site-to-github", {
+    body: { retryDeploymentId: deploymentId },
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Retry returned no result");
+  return data;
+}
+
+export async function rollbackSite(siteId: string, publishVersionId: string): Promise<GitHubPublishResult> {
+  const { data, error } = await supabase.functions.invoke<GitHubPublishResult>("publish-site-to-github", {
+    body: { siteId, rollbackVersionId: publishVersionId },
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Rollback returned no result");
+  return data;
+}
+
+export type GitHubPublishResult = {
+  deploymentId: string;
+  version: number;
+  status: "committed";
+  commitSha: string;
+  commitUrl: string;
+};
+
+export async function publishSiteToGitHub(siteId: string): Promise<GitHubPublishResult> {
+  const { data, error } = await supabase.functions.invoke<GitHubPublishResult>("publish-site-to-github", {
+    body: { siteId },
+  });
+
+  if (error) {
+    let message = error.message;
+    const context = "context" in error ? error.context : null;
+    if (context instanceof Response) {
+      const body = await context.json().catch(() => null);
+      if (body?.error) message = body.error;
+    }
+    throw new Error(message || "Website update failed");
+  }
+  if (!data) throw new Error("The publisher returned no result");
+  return data;
 }

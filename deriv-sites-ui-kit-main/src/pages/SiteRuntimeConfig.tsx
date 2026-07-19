@@ -5,7 +5,10 @@ import {
   AlertTriangle,
   ArrowLeft,
   Bot,
+  ExternalLink,
   Globe,
+  RefreshCw,
+  RotateCcw,
   Save,
   Settings2,
   Sparkles,
@@ -13,7 +16,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,9 +31,16 @@ import {
 } from "@/components/ui/select";
 import {
   createDraftSiteConfigSnapshot,
-  createSitePublishVersion,
   getDefaultSitePages,
+  getSiteDeployments,
+  getSiteIntegration,
   getSiteRuntimeConfigAdmin,
+  getSiteTools,
+  provisionSite,
+  publishSiteToGitHub,
+  retryDeployment,
+  rollbackSite,
+  setSiteTool,
   type SiteBotsManifestInput,
   type SiteDerivAppInput,
   type SiteDomainInput,
@@ -113,7 +122,6 @@ const featureItems: Array<{ key: keyof SiteFeaturesInput; label: string }> = [
 const SiteRuntimeConfig = () => {
   const { siteId = "" } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [settingsForm, setSettingsForm] = useState<SiteSettingsInput>(emptySettings);
@@ -123,10 +131,30 @@ const SiteRuntimeConfig = () => {
   const [domainForm, setDomainForm] = useState<SiteDomainInput>(emptyDomain);
   const [customCssVarsText, setCustomCssVarsText] = useState("{}");
   const [manifestForm, setManifestForm] = useState<SiteBotsManifestInput>([]);
+  const [showPreview, setShowPreview] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["site-runtime-config-admin", siteId],
     queryFn: () => getSiteRuntimeConfigAdmin(siteId),
+    enabled: !!siteId,
+  });
+
+  const { data: deployments = [] } = useQuery({
+    queryKey: ["site-deployments", siteId],
+    queryFn: () => getSiteDeployments(siteId),
+    enabled: !!siteId,
+    refetchInterval: query => query.state.data?.some(item => ["queued", "generating", "committing", "committed", "building"].includes(item.status)) ? 4000 : false,
+  });
+
+  const { data: toolsData } = useQuery({
+    queryKey: ["site-tools", siteId],
+    queryFn: () => getSiteTools(siteId),
+    enabled: !!siteId,
+  });
+
+  const { data: integration } = useQuery({
+    queryKey: ["site-integration", siteId],
+    queryFn: () => getSiteIntegration(siteId),
     enabled: !!siteId,
   });
 
@@ -292,12 +320,59 @@ const SiteRuntimeConfig = () => {
   });
 
   const publishMutation = useMutation({
-    mutationFn: () => createSitePublishVersion(siteId, user?.id),
-    onSuccess: async version => {
-      toast.success(`Publish snapshot v${version.version_number} created`);
-      await refreshConfig();
+    mutationFn: () => publishSiteToGitHub(siteId),
+    onSuccess: async result => {
+      toast.success(`Website update v${result.version} committed to GitHub`);
+      await Promise.all([
+        refreshConfig(),
+        queryClient.invalidateQueries({ queryKey: ["site-deployments", siteId] }),
+      ]);
     },
-    onError: err => toast.error(err instanceof Error ? err.message : "Failed to create publish snapshot"),
+    onError: async err => {
+      toast.error(err instanceof Error ? err.message : "Website update failed");
+      await queryClient.invalidateQueries({ queryKey: ["site-deployments", siteId] });
+    },
+  });
+
+  const toolMutation = useMutation({
+    mutationFn: ({ toolId, enabled }: { toolId: string; enabled: boolean }) => {
+      const tool = toolsData?.catalogue.find(item => item.id === toolId);
+      if (!tool) throw new Error("Tool was not found");
+      const installed = toolsData?.installed.find(item => item.tool_id === toolId);
+      return setSiteTool(siteId, tool, enabled, installed?.display_order ?? (toolsData?.installed.length || 0));
+    },
+    onSuccess: async () => {
+      toast.success("Tool selection saved");
+      await queryClient.invalidateQueries({ queryKey: ["site-tools", siteId] });
+    },
+    onError: err => toast.error(err instanceof Error ? err.message : "Failed to save tool"),
+  });
+
+  const provisionMutation = useMutation({
+    mutationFn: () => provisionSite(siteId),
+    onSuccess: async result => {
+      toast.success(`Netlify project ${result.netlify_site_name || "created"}`);
+      await queryClient.invalidateQueries({ queryKey: ["site-integration", siteId] });
+    },
+    onError: err => toast.error(err instanceof Error ? err.message : "Provisioning failed"),
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: retryDeployment,
+    onSuccess: async () => {
+      toast.success("Website update retried");
+      await Promise.all([refreshConfig(), queryClient.invalidateQueries({ queryKey: ["site-deployments", siteId] })]);
+    },
+    onError: err => toast.error(err instanceof Error ? err.message : "Retry failed"),
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: (publishVersionId: string) => rollbackSite(siteId, publishVersionId),
+    onSuccess: async () => {
+      toast.success("Previous website version restored and committed");
+      await Promise.all([refreshConfig(), queryClient.invalidateQueries({ queryKey: ["site-deployments", siteId] })]);
+    },
+    onError: err => toast.error(err instanceof Error ? err.message : "Rollback failed"),
   });
 
   const syncManifestMutation = useMutation({
@@ -484,6 +559,7 @@ const SiteRuntimeConfig = () => {
           <TabsTrigger value="domain">Domain</TabsTrigger>
           <TabsTrigger value="deriv">Deriv App</TabsTrigger>
           <TabsTrigger value="bots">Bots</TabsTrigger>
+          <TabsTrigger value="tools">Tools</TabsTrigger>
           <TabsTrigger value="publish">Publish</TabsTrigger>
         </TabsList>
 
@@ -847,16 +923,100 @@ const SiteRuntimeConfig = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="tools">
+          <Card className="bg-panel-bg border-white/10">
+            <CardHeader>
+              <CardTitle className="text-foreground text-lg flex items-center gap-2">
+                <Settings2 className="w-5 h-5 text-primary" />
+                Tool Catalogue
+              </CardTitle>
+              <CardDescription>
+                Install or remove tools for this website. Changes remain private until Update Website is clicked.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {toolsData?.catalogue.length ? toolsData.catalogue.map(tool => {
+                const installed = toolsData.installed.find(item => item.tool_id === tool.id);
+                const enabled = installed?.enabled ?? false;
+                return (
+                  <div key={tool.id} className="flex items-start justify-between gap-4 rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium text-foreground">{tool.name}</p>
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{tool.category}</span>
+                        <span className="text-[10px] text-muted-foreground">v{tool.current_version}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{tool.description || "No description"}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">Plan: {tool.minimum_plan}</p>
+                    </div>
+                    <Switch
+                      checked={enabled}
+                      disabled={toolMutation.isPending}
+                      onCheckedChange={checked => toolMutation.mutate({ toolId: tool.id, enabled: checked })}
+                    />
+                  </div>
+                );
+              }) : <p className="text-sm text-muted-foreground">No active tools are available.</p>}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="publish">
           <Card className="bg-panel-bg border-white/10">
             <CardHeader>
               <CardTitle className="text-foreground text-lg flex items-center gap-2">
                 <UploadCloud className="w-5 h-5 text-primary" />
-                Publish Snapshot
+                Update Website
               </CardTitle>
-              <CardDescription>Create stored draft or published snapshots from the normalized runtime config rows.</CardDescription>
+              <CardDescription>
+                Create a versioned configuration and commit it to the shared GitHub repository. The connected Netlify site will detect the commit automatically.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setShowPreview(value => !value)}>
+                  {showPreview ? "Hide Preview" : "Preview Draft"}
+                </Button>
+              </div>
+              {showPreview ? (
+                <div className="overflow-hidden rounded-xl border border-white/10" style={{ background: settingsForm.secondary_color || "#111827" }}>
+                  <div className="flex items-center justify-between p-4" style={{ background: settingsForm.header_bg_color || settingsForm.secondary_color || "#1f2937", color: settingsForm.header_text_color || "#ffffff" }}>
+                    <div className="flex items-center gap-3">
+                      {settingsForm.logo_url ? <img src={settingsForm.logo_url} alt="Draft logo" className="h-8 w-8 rounded object-contain" /> : null}
+                      <span className="font-semibold">{settingsForm.brand_name || settingsForm.site_name || data.site.name}</span>
+                    </div>
+                    <span className="text-xs opacity-70">Draft preview</span>
+                  </div>
+                  <div className="grid gap-3 p-4 sm:grid-cols-3">
+                    {(toolsData?.installed.filter(item => item.enabled) || []).slice(0, 6).map(item => (
+                      <div key={item.id} className="rounded-lg border border-white/10 p-3 text-sm text-white" style={{ background: settingsForm.primary_color ? `${settingsForm.primary_color}22` : "#ffffff0d" }}>
+                        {item.tool.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">GitHub and Netlify</p>
+                    <p className="text-xs text-muted-foreground">
+                      {integration?.status === "connected"
+                        ? `Connected to ${integration.netlify_site_name}`
+                        : integration?.last_error || "Provision this website before its first production update."}
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => provisionMutation.mutate()} disabled={provisionMutation.isPending || integration?.status === "connected"}>
+                    <Globe className="w-4 h-4 mr-2" />
+                    {provisionMutation.isPending ? "Provisioning..." : integration?.status === "connected" ? "Connected" : "Provision Website"}
+                  </Button>
+                </div>
+                {integration?.netlify_site_url ? (
+                  <a href={integration.netlify_site_url} target="_blank" rel="noreferrer" className="inline-flex items-center text-xs text-primary hover:underline">
+                    Open production website <ExternalLink className="w-3 h-3 ml-1" />
+                  </a>
+                ) : null}
+              </div>
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 {latestSnapshot ? (
                   <>
@@ -877,6 +1037,48 @@ const SiteRuntimeConfig = () => {
                 )}
               </div>
 
+              {deployments.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Recent updates</p>
+                  {deployments.slice(0, 5).map(deployment => (
+                    <div key={deployment.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm capitalize text-foreground">{deployment.status}</span>
+                        <span className="text-xs text-muted-foreground">{new Date(deployment.created_at).toLocaleString()}</span>
+                      </div>
+                      {deployment.commit_url ? (
+                        <a href={deployment.commit_url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                          Commit {deployment.commit_sha?.slice(0, 7)}
+                        </a>
+                      ) : null}
+                      {deployment.netlify_log_url ? (
+                        <a href={deployment.netlify_log_url} target="_blank" rel="noreferrer" className="ml-3 text-xs text-primary hover:underline">
+                          Netlify deploy log
+                        </a>
+                      ) : null}
+                      {deployment.netlify_deploy_url ? (
+                        <a href={deployment.netlify_deploy_url} target="_blank" rel="noreferrer" className="ml-3 text-xs text-primary hover:underline">
+                          Deployed website
+                        </a>
+                      ) : null}
+                      {deployment.error_message ? <p className="text-xs text-red-400 mt-1">{deployment.error_message}</p> : null}
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {(deployment.status.includes("failed") || deployment.status === "failed") ? (
+                          <Button size="sm" variant="outline" onClick={() => retryMutation.mutate(deployment.id)} disabled={retryMutation.isPending}>
+                            <RefreshCw className="w-3 h-3 mr-1" /> Retry
+                          </Button>
+                        ) : null}
+                        {deployment.publish_version_id && deployment.status === "deployed" ? (
+                          <Button size="sm" variant="outline" onClick={() => rollbackMutation.mutate(deployment.publish_version_id!)} disabled={rollbackMutation.isPending}>
+                            <RotateCcw className="w-3 h-3 mr-1" /> Restore this version
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap justify-end gap-3">
                 <Button variant="outline" onClick={() => draftMutation.mutate()} disabled={draftMutation.isPending}>
                   <UploadCloud className="w-4 h-4 mr-2" />
@@ -884,7 +1086,7 @@ const SiteRuntimeConfig = () => {
                 </Button>
                 <Button onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending}>
                   <UploadCloud className="w-4 h-4 mr-2" />
-                  {publishMutation.isPending ? "Creating..." : "Create Publish Snapshot"}
+                  {publishMutation.isPending ? "Updating website..." : "Update Website"}
                 </Button>
               </div>
             </CardContent>

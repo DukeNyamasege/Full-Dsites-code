@@ -96,7 +96,7 @@ const ApiPlatforms = () => {
   const totalSales = sales.length;
   const totalRevenue = sales.reduce((sum, s) => sum + s.owner_earnings, 0);
   const commissionSales = sales.filter(s => s.sale_type === 'commission').length;
-  const ownershipSales = sales.filter(s => s.sale_type === 'ownership').length;
+  const oneTimeSales = sales.filter(s => s.sale_type === 'ownership' || s.sale_type === 'one_time').length;
 
   if (isLoading) {
     return (
@@ -201,7 +201,7 @@ const ApiPlatforms = () => {
                   <p className="text-xs text-green-400">You keep {currentPlatform.commission_rate - 8}%</p>
                 </div>
                 <div className="p-3 rounded-lg bg-white/5">
-                  <p className="text-xs text-muted-foreground mb-1">Ownership Price</p>
+                  <p className="text-xs text-muted-foreground mb-1">One-time Price</p>
                   <p className="text-lg font-bold text-foreground">KES {currentPlatform.ownership_price.toLocaleString()}</p>
                   <p className="text-xs text-green-400">You keep {(currentPlatform.ownership_price - 5000).toLocaleString()}</p>
                 </div>
@@ -210,7 +210,7 @@ const ApiPlatforms = () => {
                   <p className="text-lg font-bold text-foreground">{currentPlatform.developer_commission_rate}%</p>
                 </div>
                 <div className="p-3 rounded-lg bg-white/5">
-                  <p className="text-xs text-muted-foreground mb-1">Dev Ownership Fee</p>
+                  <p className="text-xs text-muted-foreground mb-1">Dev One-time Fee</p>
                   <p className="text-lg font-bold text-foreground">KES {currentPlatform.developer_ownership_fee.toLocaleString()}</p>
                 </div>
               </div>
@@ -253,9 +253,9 @@ const ApiPlatforms = () => {
                   <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
                     <ExternalLink className="w-4 h-4 text-purple-400" />
                   </div>
-                  <span className="text-xs text-muted-foreground">Ownership Sales</span>
+                  <span className="text-xs text-muted-foreground">One-time Sales</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{ownershipSales}</p>
+                <p className="text-2xl font-bold text-foreground">{oneTimeSales}</p>
               </div>
             </div>
 

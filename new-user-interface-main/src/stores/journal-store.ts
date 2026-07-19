@@ -1,5 +1,4 @@
 import { action, computed, makeObservable, observable, reaction, when } from 'mobx';
-import { v4 as uuidv4 } from 'uuid';
 /* [AI] - Analytics removed - utility functions moved to @/utils/account-helpers */
 import { isVirtualAccount } from '@/utils/account-helpers';
 /* [/AI] */
@@ -263,7 +262,7 @@ export default class JournalStore {
 
         const date = formatDate(this.getServerTime());
         const time = formatDate(this.getServerTime(), 'HH:mm:ss [GMT]');
-        const unique_id = uuidv4();
+        const unique_id = crypto.randomUUID();
 
         this.unfiltered_messages.unshift({ date, time, message, message_type, className, unique_id, extra });
         this.unfiltered_messages = this.unfiltered_messages.slice(); // force array update

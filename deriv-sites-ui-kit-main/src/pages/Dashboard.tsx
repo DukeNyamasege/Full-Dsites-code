@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Globe, Clock, AlertCircle, RefreshCw } from "lucide-react";
+import { Globe, Clock, AlertCircle, RefreshCw, Settings2, Rocket, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboard } from "@/hooks/useDashboard";
 import { differenceInDays } from "date-fns";
@@ -104,7 +104,7 @@ const Dashboard = () => {
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   {daysToExpire <= 0
-                    ? 'Renew your Full Ownership plan to continue accessing all features.'
+                    ? 'Renew your one-time setup plan to continue accessing all features.'
                     : 'Renew now to avoid any service interruption and keep your sites running.'}
                 </p>
                 <button
@@ -133,13 +133,13 @@ const Dashboard = () => {
             <p className="text-xs text-muted-foreground">{sites.length} total sites</p>
           </div>
 
-          {/* Full Ownership - Days to Expire */}
+          {/* One-time setup - Days to Expire */}
           <div className="p-4 sm:p-5 rounded-xl bg-panel-bg border border-white/10">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
                 <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
               </div>
-              <span className="text-xs sm:text-sm text-muted-foreground">Full Ownership</span>
+              <span className="text-xs sm:text-sm text-muted-foreground">One-time Setup</span>
             </div>
             {subscription?.plan_type === 'onetime' ? (
               <>
@@ -158,6 +158,11 @@ const Dashboard = () => {
             )}
           </div>
         </div>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between"><div><h2 className="text-lg font-semibold">Your sites</h2><p className="text-xs text-muted-foreground">Configuration, deployment, and live-site access.</p></div><button className="text-sm text-primary" onClick={() => navigate('/domains')}>Manage domains</button></div>
+          {sites.length === 0 ? <div className="rounded-xl border border-white/10 bg-panel-bg p-6 text-sm text-muted-foreground">No sites yet. Buy or connect a domain to start the guided setup.</div> : <div className="grid md:grid-cols-2 gap-3">{sites.map(site => <article key={site.id} className="rounded-xl border border-white/10 bg-panel-bg p-4 space-y-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-medium">{site.name}</h3><p className="text-xs text-muted-foreground mt-1">Configuration: {site.configuration_status || 'legacy'}{site.active_configuration_version ? ` · v${site.active_configuration_version}` : ''}</p></div><span className={`rounded-full px-2 py-1 text-xs ${site.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>{site.status}</span></div><div className="flex flex-wrap gap-2"><button className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-2 text-xs" onClick={() => navigate(`/sites/${site.id}/wizard`)}><Settings2 className="w-3.5 h-3.5" />Configure</button><button className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-2 text-xs" onClick={() => navigate(`/sites/${site.id}/config`)}><Rocket className="w-3.5 h-3.5" />Deployments</button>{site.status === 'active' && site.domain_purchases?.domain_name && <a className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-2 text-xs" href={`https://${site.domain_purchases.domain_name}`} target="_blank" rel="noreferrer"><ExternalLink className="w-3.5 h-3.5" />Open site</a>}</div></article>)}</div>}
+        </section>
       </div>
     </div>
   );

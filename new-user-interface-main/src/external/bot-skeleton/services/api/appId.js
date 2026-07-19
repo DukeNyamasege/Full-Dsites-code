@@ -129,32 +129,3 @@ export const V2GetActiveAccountId = () => {
     if (account_id && account_id !== 'null') return account_id;
     return null;
 };
-
-export const getToken = () => {
-    const active_loginid = getLoginId();
-    const accountsList_raw = localStorage.getItem('accountsList');
-    let client_accounts;
-
-    try {
-        client_accounts = accountsList_raw ? JSON.parse(accountsList_raw) : undefined;
-    } catch (e) {
-        console.error('[getToken] Failed to parse accountsList:', e);
-        client_accounts = undefined;
-    }
-
-    const active_account = (client_accounts && client_accounts[active_loginid]) || undefined;
-
-    console.log('[getToken] Debug info:', {
-        active_loginid,
-        accountsList_raw: accountsList_raw ? 'Present' : 'MISSING',
-        client_accounts_keys: client_accounts ? Object.keys(client_accounts) : 'N/A',
-        active_account_type: typeof active_account,
-        active_account_value: active_account ? 'Present' : 'MISSING',
-        has_token: !!active_account,
-    });
-
-    return {
-        token: active_account ?? undefined,
-        account_id: active_loginid ?? undefined,
-    };
-};

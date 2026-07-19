@@ -1,6 +1,6 @@
 import { CONTRACT_TYPES } from '@/components/shared';
 
-import { getSymbolRequestField, removeUndefinedFields } from '../services/api/legacy-request';
+import { getSymbolRequestField, removeUndefinedFields } from '../services/api/options-request';
 
 // Default barrier values
 const DEFAULT_DIGIT_BARRIER = 5;

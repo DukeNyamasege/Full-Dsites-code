@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { arrayAsMessage, messageWithButton } from '@/components/notify-item';
 import { localize } from '@deriv-com/translations';
 
@@ -76,7 +75,7 @@ export const isCustomJournalMessage = (
 
         // Combine with HTML for formatting - send direct HTML string with SVG icon
         const statusMessage = `
-        <div key="stat-count-${uuidv4()}">${waitingText}</div>
+        <div key="stat-count-${crypto.randomUUID()}">${waitingText}</div>
         <span>
             <strong>${statsText}</strong>&nbsp;&nbsp;|&nbsp;&nbsp;${message}
         </span>

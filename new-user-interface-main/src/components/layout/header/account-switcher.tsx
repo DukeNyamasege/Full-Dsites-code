@@ -65,16 +65,6 @@ const AccountSwitcher = observer(({ activeAccount }: TAccountSwitcher) => {
             localStorage.setItem('active_loginid', loginid);
             localStorage.setItem('account_type', isDemoAccount(loginid) ? 'demo' : 'real');
 
-            const accountsListRaw = localStorage.getItem('accountsList');
-            if (accountsListRaw) {
-                try {
-                    const accountsList = JSON.parse(accountsListRaw) as Record<string, string>;
-                    if (accountsList[loginid]) localStorage.setItem('authToken', accountsList[loginid]);
-                } catch (error) {
-                    console.error('[AccountSwitcher] Failed to update legacy auth token:', error);
-                }
-            }
-
             client?.checkAndRegenerateWebSocket();
             setIsOpen(false);
         },

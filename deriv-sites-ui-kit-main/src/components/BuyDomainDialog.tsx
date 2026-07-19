@@ -69,11 +69,24 @@ const BuyDomainDialog = ({ open, onOpenChange }: BuyDomainDialogProps) => {
           .limit(1)
           .single();
 
-        // Create site record
-        const { data: siteData, error: siteError } = await supabase
+        // Generated database types are refreshed only after the migration is applied.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = supabase as any;
+        const { data: memberships, error: membershipError } = await db.from('organisation_members').select('organisation_id').eq('user_id', user.id).eq('status', 'active').in('role', ['tenant_owner', 'tenant_developer']).limit(1);
+        if (membershipError) throw membershipError;
+        let organisationId = memberships?.[0]?.organisation_id;
+        if (!organisationId) {
+          const created = await db.rpc('create_personal_organisation', { _name: `${user.email?.split('@')[0] || 'My'} sites` });
+          if (created.error) throw created.error;
+          organisationId = created.data;
+        }
+
+        // Create a tenant-owned site and its runtime domain record.
+        const { data: siteData, error: siteError } = await db
           .from('sites')
           .insert({
             user_id: user.id,
+            organisation_id: organisationId,
             name: selectedDomain.domain.split('.')[0],
             domain_id: purchaseData?.id || null,
             status: 'setup',
@@ -84,6 +97,8 @@ const BuyDomainDialog = ({ open, onOpenChange }: BuyDomainDialogProps) => {
         if (siteError) {
           console.error('Error creating site:', siteError);
         } else if (siteData) {
+          const { error: domainError } = await db.from('site_domains').insert({ site_id: siteData.id, hostname: selectedDomain.domain.toLowerCase(), is_primary: true, status: 'pending', is_verified: false });
+          if (domainError) throw domainError;
           setCreatedSiteId(siteData.id);
         }
       } catch (err) {
@@ -614,7 +629,7 @@ const BuyDomainDialog = ({ open, onOpenChange }: BuyDomainDialogProps) => {
                 if (createdSiteId && selectedDomain) {
                   resetDialog();
                   onOpenChange(false);
-                  navigate(`/setup/app-id?siteId=${createdSiteId}&domain=${encodeURIComponent(selectedDomain.domain)}`);
+                  navigate(`/sites/${createdSiteId}/wizard`);
                 } else {
                   handleClose();
                 }

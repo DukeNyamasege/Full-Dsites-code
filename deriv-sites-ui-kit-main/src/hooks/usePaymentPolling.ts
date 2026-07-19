@@ -49,8 +49,6 @@ export const usePaymentPolling = (
     }
 
     setIsPolling(true);
-    let intervalId: ReturnType<typeof setInterval>;
-    let timeoutId: ReturnType<typeof setTimeout>;
     let attempts = 0;
 
     // 30 seconds total (poll every 2s => 15 attempts)
@@ -121,18 +119,19 @@ export const usePaymentPolling = (
       }
     };
 
-    // Initial check
-    poll();
-
     // Poll every 2 seconds
-    intervalId = setInterval(poll, 2000);
+    const intervalId = setInterval(poll, 2000);
 
     // Absolute timeout as a safety net
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setIsPolling(false);
       clearInterval(intervalId);
       markTimedOut();
     }, TIMEOUT_SECONDS * 1000);
+
+    // Run the initial check after timer handles exist so a terminal response can
+    // safely clear both timers.
+    void poll();
 
     return () => {
       clearInterval(intervalId);

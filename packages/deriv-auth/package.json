@@ -2,5 +2,11 @@
   "name": "@reef-sites/deriv-auth",
   "private": true,
   "version": "0.1.0",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@reef-sites/shared-types": "0.1.0"
+  }
 }

@@ -2,7 +2,7 @@ import { findValueByKeyRecursively, formatTime, getRoundedNumber, isEmptyObject 
 import { getLocalizedErrorMessage } from '@/constants/backend-error-messages';
 import { config } from '@/external/bot-skeleton/constants';
 import { localize } from '@deriv-com/translations';
-import { getSymbolRequestField, removeUndefinedFields } from '../../api/legacy-request';
+import { getSymbolRequestField, removeUndefinedFields } from '../../api/options-request';
 import { observer as globalObserver } from '../../../utils/observer';
 import { error as logError } from './broadcast';
 

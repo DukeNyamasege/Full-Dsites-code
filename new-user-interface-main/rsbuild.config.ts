@@ -25,6 +25,9 @@ export default defineConfig({
                 CLIENT_ID: JSON.stringify(process.env.CLIENT_ID),
                 APP_ID: JSON.stringify(process.env.APP_ID),
                 REDIRECT_URI: JSON.stringify(process.env.REDIRECT_URI || ''),
+                REEF_SITE_ID: JSON.stringify(process.env.REEF_SITE_ID || ''),
+                REEF_SITE_CONFIG_URL: JSON.stringify(process.env.REEF_SITE_CONFIG_URL || '/site.config.json'),
+                SITE_CONFIG_API_BASE_URL: JSON.stringify(process.env.SITE_CONFIG_API_BASE_URL || ''),
                 GD_CLIENT_ID: JSON.stringify(process.env.GD_CLIENT_ID),
                 GD_APP_ID: JSON.stringify(process.env.GD_APP_ID),
                 GD_API_KEY: JSON.stringify(process.env.GD_API_KEY),
@@ -33,8 +36,8 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            react: path.resolve('./node_modules/react'),
-            'react-dom': path.resolve('./node_modules/react-dom'),
+            react: path.dirname(require.resolve('react/package.json')),
+            'react-dom': path.dirname(require.resolve('react-dom/package.json')),
             '@/external': path.resolve(__dirname, './src/external'),
             '@/components': path.resolve(__dirname, './src/components'),
             '@/hooks': path.resolve(__dirname, './src/hooks'),
@@ -45,6 +48,14 @@ export default defineConfig({
     },
     output: {
         copy: [
+            ...(process.env.REEF_SITE_ID
+                ? [
+                      {
+                          from: path.resolve(__dirname, `../sites/${process.env.REEF_SITE_ID}/site.config.json`),
+                          to: 'site.config.json',
+                      },
+                  ]
+                : []),
             {
                 from: 'node_modules/@deriv-com/smartcharts-champion/dist/*',
                 to: 'js/smartcharts/[name][ext]',

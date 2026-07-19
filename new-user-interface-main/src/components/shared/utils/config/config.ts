@@ -1,5 +1,5 @@
 import { DerivWSAccountsService } from '@/services/derivws-accounts.service';
-import { OAuthTokenExchangeService } from '@/services/oauth-token-exchange.service';
+import { getRuntimeSiteConfig } from '@/config/runtime-site-config';
 import brandConfig from '../../../../../brand.config.json';
 
 // =============================================================================
@@ -8,14 +8,6 @@ import brandConfig from '../../../../../brand.config.json';
 // exact redirect URI registered in that OAuth app. Add a new entry here to
 // support an additional domain — no other code changes required.
 // =============================================================================
-
-interface DomainConfig {
-    clientId: string; // OAuth 2.0 CLIENT_ID (new OAuth app)
-    appId: string; // Legacy Deriv APP_ID for intelligent platform routing
-    redirectUri: string; // MUST match the redirect URL registered in the OAuth app exactly
-    botsFolder: string; // Public folder used by Best Bots XML loading for this domain
-    features: DomainFeatureFlags;
-}
 
 type DomainFeatureFlags = {
     botIdeas: boolean;
@@ -67,17 +59,6 @@ interface DomainConfig {
     ui: DomainUIConfig;
 }
 
-interface HostedDomainDefinition {
-    primaryDomain: string;
-    aliases?: string[];
-    clientId: string;
-    appId: string;
-    botsFolder?: string;
-    features?: Partial<DomainFeatureFlags>;
-    redirectUri?: string;
-    ui?: Partial<DomainUIConfig>;
-}
-
 const DEFAULT_BOTS_FOLDER = 'optimumtraders.site';
 const DEFAULT_DOMAIN_FEATURES: DomainFeatureFlags = {
     botIdeas: true,
@@ -120,137 +101,8 @@ const DEFAULT_DOMAIN_UI: DomainUIConfig = {
     customCssVars: {},
 };
 
-const createHostedDomainEntries = ({
-    primaryDomain,
-    aliases = [],
-    clientId,
-    appId,
-    botsFolder = primaryDomain,
-    features = {},
-    redirectUri = `https://${primaryDomain}/`,
-    ui = {},
-}: HostedDomainDefinition): Record<string, DomainConfig> => {
-    const config: DomainConfig = {
-        clientId,
-        appId,
-        redirectUri,
-        botsFolder,
-        features: {
-            ...DEFAULT_DOMAIN_FEATURES,
-            ...features,
-        },
-        ui: {
-            ...DEFAULT_DOMAIN_UI,
-            ...ui,
-        },
-    };
-
-    return [primaryDomain, ...aliases].reduce<Record<string, DomainConfig>>((accumulator, hostname) => {
-        accumulator[hostname] = config;
-        return accumulator;
-    }, {});
-};
-
-export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
-    // ── Primary production domain ────────────────────────────────────────────
-    // New OAuth app registered redirect: https://riskmanagers.site/ (trailing slash)
-    ...createHostedDomainEntries({
-        primaryDomain: 'riskmanagers.site',
-        aliases: ['www.riskmanagers.site'],
-        clientId: '33cCr2bWsByPgLlormNFw',
-        appId: '71937',
-        features: {
-            autoTrades: true,
-            comboTrades: true,
-        },
-    }),
-    // ── Additional production domain ─────────────────────────────────────────
-    ...createHostedDomainEntries({
-        primaryDomain: 'termicafx.site',
-        aliases: ['www.termicafx.site'],
-        clientId: '33h4ThjleZotVMiKQ1gE7',
-        appId: '124217',
-        botsFolder: 'optimumtraders.site',
-        features: {
-            botIdeas: false,
-            scanner: false,
-            printPopups: false,
-        },
-    }),
-    // ── optimumtraders.site (restricted tabs + dedicated best-bots folder) ──
-    ...createHostedDomainEntries({
-        primaryDomain: 'optimumtraders.site',
-        aliases: ['www.optimumtraders.site'],
-        clientId: '33iVPZJo7xEEzyUpjLqcX',
-        appId: '116847',
-        botsFolder: 'optimumtraders.site',
-        features: {
-            botIdeas: false,
-            scanner: false,
-            autoTrades: false,
-            comboTrades: false,
-            printPopups: false,
-        },
-    }),
-    ...createHostedDomainEntries({
-        primaryDomain: 'mrzetuzetu.site',
-        aliases: ['www.mrzetuzetu.site'],
-        clientId: '33gJ6p5dXzASAIobgv9az',
-        appId: '80364',
-        botsFolder: 'optimumtraders.site',
-        features: {
-            autoTrades: true,
-            comboTrades: true,
-        },
-    }),
-    ...createHostedDomainEntries({
-        primaryDomain: 'masterhunter.site',
-        aliases: ['www.masterhunter.site'],
-        clientId: '33g5WCS5YOFHD3aWLZZjj',
-        appId: '96223',
-        botsFolder: 'optimumtraders.site',
-        features: {
-            autoTrades: true,
-            comboTrades: true,
-        },
-    }),
-    ...createHostedDomainEntries({
-        primaryDomain: 'tradinghubs.site',
-        aliases: ['www.tradinghubs.site'],
-        clientId: '33hi7ev9NiDjWY640JuSw',
-        appId: '122208',
-        botsFolder: 'optimumtraders.site',
-        features: {
-            autoTrades: true,
-            comboTrades: true,
-        },
-    }),
-    ...createHostedDomainEntries({
-        primaryDomain: 'mafiahub.site',
-        aliases: ['www.mafiahub.site'],
-        clientId: '331bCUS8izRudblAnSACt',
-        appId: '120589',
-        botsFolder: 'optimumtraders.site',
-        features: {
-            autoTrades: true,
-            comboTrades: true,
-        },
-    }),
-    // ── Netlify preview domain (uses same OAuth app; Deriv will redirect back
-    //    to riskmanagers.site after login) ────────────────────────────────────
-    'newwapi.netlify.app': {
-        clientId: '33cCr2bWsByPgLlormNFw',
-        appId: '71937',
-        redirectUri: 'https://riskmanagers.site/',
-        botsFolder: 'optimumtraders.site',
-        features: {
-            ...DEFAULT_DOMAIN_FEATURES,
-            autoTrades: false,
-            comboTrades: false,
-        },
-        ui: DEFAULT_DOMAIN_UI,
-    },
-};
+// Production sites are configured exclusively by versioned runtime config.
+export const DOMAIN_CONFIG: Record<string, DomainConfig> = {};
 
 export const getDomainConfigForHost = (hostname: string): DomainConfig | undefined => DOMAIN_CONFIG[hostname];
 
@@ -260,6 +112,51 @@ export const getDomainConfigForHost = (hostname: string): DomainConfig | undefin
  * listed in DOMAIN_CONFIG.
  */
 export const getDomainConfig = (): DomainConfig => {
+    const runtime = getRuntimeSiteConfig();
+    if (runtime) {
+        const theme = runtime.branding.theme || {};
+        const enabled = (key: string, fallback: boolean) => {
+            const tool = runtime.tools?.find(item => item.key === key);
+            const aliases: Record<string, string> = {
+                bot_ideas: 'botIdeas',
+                print_popups: 'printPopups',
+                auto_trades: 'autoTrades',
+                combo_trades: 'comboTrades',
+                manual_trading: 'manualTrading',
+                best_bots: 'bestBots',
+                copy_trading: 'copyTrading',
+                percentage_tool: 'percentageTool',
+            };
+            return tool?.enabled ?? runtime.features?.[key] ?? runtime.features?.[aliases[key]] ?? fallback;
+        };
+        return {
+            clientId: runtime.deriv.oauthClientId || '',
+            appId: runtime.deriv.appId || process.env.APP_ID || '',
+            redirectUri: window.location.origin,
+            botsFolder: runtime.site.id,
+            features: {
+                botIdeas: enabled('bot_ideas', true),
+                scanner: enabled('scanner', true),
+                printPopups: enabled('print_popups', false),
+                autoTrades: enabled('auto_trades', true),
+                comboTrades: enabled('combo_trades', false),
+                chart: enabled('chart', true),
+                tutorials: enabled('tutorials', true),
+            },
+            ui: {
+                ...DEFAULT_DOMAIN_UI,
+                brandName: runtime.branding.brandName,
+                primaryColor: theme.primaryColor || DEFAULT_DOMAIN_UI.primaryColor,
+                secondaryColor: theme.secondaryColor || DEFAULT_DOMAIN_UI.secondaryColor,
+                accentColor: theme.accentColor || DEFAULT_DOMAIN_UI.accentColor,
+                logoUrl: runtime.branding.logoUrl || '',
+                faviconUrl: runtime.branding.faviconUrl || '',
+                headerBgColor: theme.headerBgColor || DEFAULT_DOMAIN_UI.headerBgColor,
+                headerTextColor: theme.headerTextColor || DEFAULT_DOMAIN_UI.headerTextColor,
+                customCssVars: runtime.branding.customCssVars || {},
+            },
+        };
+    }
     const hostname = window.location.hostname;
     const domain_config = getDomainConfigForHost(hostname);
     if (domain_config) {
@@ -268,7 +165,7 @@ export const getDomainConfig = (): DomainConfig => {
     // Fallback — used on localhost and Replit dev domains
     return {
         clientId: process.env.CLIENT_ID || '',
-        appId: process.env.APP_ID || '71937',
+        appId: process.env.APP_ID || '',
         redirectUri: process.env.REDIRECT_URI || window.location.origin,
         botsFolder: process.env.BOTS_FOLDER || DEFAULT_BOTS_FOLDER,
         features: DEFAULT_DOMAIN_FEATURES,
@@ -320,6 +217,15 @@ export const applyDomainUI = (): void => {
     if (ui.brandName) {
         document.title = ui.brandName;
     }
+    if (ui.faviconUrl) {
+        let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+        if (!favicon) {
+            favicon = document.createElement('link');
+            favicon.rel = 'icon';
+            document.head.appendChild(favicon);
+        }
+        favicon.href = ui.faviconUrl;
+    }
 };
 
 export const buildBestBotsFileUrl = (bots_folder: string, file_name: string) => {
@@ -338,12 +244,6 @@ export const WS_SERVERS = {
     STAGING: `${brandConfig.platform.derivws.url.staging}options/ws/public`,
     PRODUCTION: `${brandConfig.platform.derivws.url.production}options/ws/public`,
 } as const;
-
-// Classic Deriv WebSocket API used by legacy OAuth tokens.
-// DerivAPIBasic expects this `/websockets/v3` protocol for calls such as
-// `authorize`, `balance`, `proposal`, `buy`, etc. Legacy `a1-...` tokens do
-// not authorize correctly against the newer DerivWS `/trading/v1/...` URLs.
-const LEGACY_WS_SERVER = 'wss://ws.derivws.com/websockets/v3';
 
 // Legacy — kept for backward-compat with imports elsewhere
 export const PRODUCTION_DOMAINS = {
@@ -380,65 +280,15 @@ const getDefaultServerURL = () => {
     return isProductionEnv ? WS_SERVERS.PRODUCTION : WS_SERVERS.STAGING;
 };
 
-const getLegacyServerURL = () => {
-    const { appId } = getDomainConfig();
-    return `${LEGACY_WS_SERVER}?app_id=${encodeURIComponent(appId)}`;
-};
-
-/**
- * Gets the WebSocket URL using the appropriate authentication flow
- * This function handles both:
- *
- * PKCE OAuth2 Flow (New users):
- * 1. Get access token from auth_info (sessionStorage)
- * 2. Fetch accounts list from derivatives/accounts
- * 3. Store accounts in sessionStorage
- * 4. Get default account (first from list)
- * 5. Fetch OTP and WebSocket URL for that account
- *
- * Legacy OAuth Flow (Legacy users):
- * 1. Check if user has legacy token in localStorage (from ?acct1=...&token1=...)
- * 2. If found, return classic Deriv WebSocket URL with app_id
- * 3. api_base.ts will authorize using api.authorize(token) with the legacy token
- *
- * @returns Promise with WebSocket URL or fallback to default server
- */
+/** Returns an account-specific OTP socket for a BFF session, otherwise the public socket. */
 export const getSocketURL = async (): Promise<string> => {
     try {
-        // Check PKCE OAuth first (new platform users)
-        const authInfo = OAuthTokenExchangeService.getAuthInfo();
-        if (authInfo?.access_token) {
-            console.log('[getSocketURL] PKCE user detected - fetching authenticated WebSocket URL');
-            // Use the DerivWSAccountsService to get authenticated WebSocket URL
-            const wsUrl = await DerivWSAccountsService.getAuthenticatedWebSocketURL(authInfo.access_token);
-            return wsUrl;
-        }
-
-        // Check for legacy token in localStorage (legacy platform users)
-        // Legacy tokens are stored by storeLegacyAccounts() from OAuth redirect params
-        const accountsList_raw = localStorage.getItem('accountsList');
-        if (accountsList_raw) {
-            try {
-                const accountsList = JSON.parse(accountsList_raw);
-                const active_loginid = localStorage.getItem('active_loginid');
-                if (active_loginid && accountsList[active_loginid]) {
-                    const legacyWsUrl = getLegacyServerURL();
-                    console.log('[getSocketURL] Legacy user detected with token - using classic WebSocket URL');
-                    // For legacy users, DerivAPIBasic must connect to classic `/websockets/v3`.
-                    // The newer DerivWS `/trading/v1/options/ws/public` endpoint can open, but
-                    // legacy `api.authorize(token)` will not complete there.
-                    return legacyWsUrl;
-                }
-            } catch (e) {
-                console.error('[getSocketURL] Error parsing legacy accountsList:', e);
-            }
-        }
-
-        // No authentication found
-        console.log('[getSocketURL] No authentication found - returning default server URL');
-        return getDefaultServerURL();
+        const session = await DerivWSAccountsService.getSession();
+        return session.authenticated
+            ? await DerivWSAccountsService.getAuthenticatedWebSocketURL()
+            : getDefaultServerURL();
     } catch (error) {
-        console.error('[DerivWS] Error in getSocketURL:', error);
+        // An unauthenticated visitor uses only the public market-data socket.
         return getDefaultServerURL();
     }
 };
@@ -450,192 +300,10 @@ export const getDebugServiceWorker = () => {
     return false;
 };
 
-/**
- * Generates a cryptographically secure CSRF token
- * @returns A random base64url-encoded string
- */
-const generateCSRFToken = (): string => {
-    // Generate 32 random bytes (256 bits) for strong security
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-
-    // Convert to base64url encoding (URL-safe)
-    const base64 = btoa(String.fromCharCode(...array));
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
-
-/**
- * Generates a PKCE code verifier (random string)
- * @returns A cryptographically random base64url-encoded string (43-128 characters)
- */
-const generateCodeVerifier = (): string => {
-    // Generate 32 random bytes (will result in 43 characters after base64url encoding)
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-
-    // Convert to base64url encoding (URL-safe, no padding)
-    const base64 = btoa(String.fromCharCode(...array));
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
-
-/**
- * Generates a PKCE code challenge from a code verifier using SHA-256
- * @param verifier The code verifier string
- * @returns Promise that resolves to the base64url-encoded SHA-256 hash
- */
-const generateCodeChallenge = async (verifier: string): Promise<string> => {
-    // Encode the verifier as UTF-8
-    const encoder = new TextEncoder();
-    const data = encoder.encode(verifier);
-
-    // Hash with SHA-256
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-
-    // Convert to base64url encoding
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const base64 = btoa(String.fromCharCode(...hashArray));
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
-
-/**
- * Stores PKCE code verifier in sessionStorage for token exchange
- * @param verifier The code verifier to store
- */
-const storeCodeVerifier = (verifier: string): void => {
-    sessionStorage.setItem('oauth_code_verifier', verifier);
-    // Also store timestamp for verifier expiration (e.g., 10 minutes)
-    sessionStorage.setItem('oauth_code_verifier_timestamp', Date.now().toString());
-};
-
-/**
- * Retrieves and validates the stored PKCE code verifier
- * @returns The code verifier if valid and not expired, null otherwise
- */
-export const getCodeVerifier = (): string | null => {
-    const verifier = sessionStorage.getItem('oauth_code_verifier');
-    const timestamp = sessionStorage.getItem('oauth_code_verifier_timestamp');
-
-    if (!verifier || !timestamp) {
-        return null;
-    }
-
-    // Check if verifier is expired (10 minutes = 600000ms)
-    const verifierAge = Date.now() - parseInt(timestamp, 10);
-    if (verifierAge > 600000) {
-        // Clean up expired verifier
-        sessionStorage.removeItem('oauth_code_verifier');
-        sessionStorage.removeItem('oauth_code_verifier_timestamp');
-        return null;
-    }
-
-    return verifier;
-};
-
-/**
- * Clears PKCE code verifier from sessionStorage after successful token exchange
- */
-export const clearCodeVerifier = (): void => {
-    sessionStorage.removeItem('oauth_code_verifier');
-    sessionStorage.removeItem('oauth_code_verifier_timestamp');
-};
-
-/**
- * Stores CSRF token in sessionStorage for validation after OAuth callback
- * @param token The CSRF token to store
- */
-const storeCSRFToken = (token: string): void => {
-    sessionStorage.setItem('oauth_csrf_token', token);
-    // Also store timestamp for token expiration (e.g., 10 minutes)
-    sessionStorage.setItem('oauth_csrf_token_timestamp', Date.now().toString());
-};
-
-/**
- * Validates CSRF token from OAuth callback
- * @param token The token to validate
- * @returns true if token is valid and not expired
- */
-export const validateCSRFToken = (token: string): boolean => {
-    const storedToken = sessionStorage.getItem('oauth_csrf_token');
-    const timestamp = sessionStorage.getItem('oauth_csrf_token_timestamp');
-
-    if (!storedToken || !timestamp) {
-        return false;
-    }
-
-    // Check if token matches
-    if (storedToken !== token) {
-        return false;
-    }
-
-    // Check if token is expired (10 minutes = 600000ms)
-    const tokenAge = Date.now() - parseInt(timestamp, 10);
-    if (tokenAge > 600000) {
-        // Clean up expired token
-        sessionStorage.removeItem('oauth_csrf_token');
-        sessionStorage.removeItem('oauth_csrf_token_timestamp');
-        return false;
-    }
-
-    return true;
-};
-
-/**
- * Clears CSRF token from sessionStorage after successful validation
- */
-export const clearCSRFToken = (): void => {
-    sessionStorage.removeItem('oauth_csrf_token');
-    sessionStorage.removeItem('oauth_csrf_token_timestamp');
-};
-
-export const generateOAuthURL = async (prompt?: string) => {
+export const generateOAuthURL = async (_prompt?: string) => {
     try {
-        // Resolve config for the current domain (auto-selects the right
-        // CLIENT_ID, APP_ID, and redirect URI from DOMAIN_CONFIG)
-        const domainCfg = getDomainConfig();
-        const { clientId, appId, redirectUri } = {
-            clientId: domainCfg.clientId,
-            appId: domainCfg.appId,
-            redirectUri: domainCfg.redirectUri,
-        };
-
-        // Use brand config for the OAuth2 base URL
-        const environment = isProduction() ? 'production' : 'staging';
-        const hostname = brandConfig?.platform.auth2_url?.[environment];
-
-        if (hostname && clientId) {
-            // Generate CSRF token for security
-            const csrfToken = generateCSRFToken();
-            storeCSRFToken(csrfToken);
-
-            // Generate PKCE parameters
-            const codeVerifier = generateCodeVerifier();
-            const codeChallenge = await generateCodeChallenge(codeVerifier);
-            storeCodeVerifier(codeVerifier);
-
-            // redirectUri is sourced from DOMAIN_CONFIG and must match the URL
-            // registered in the Deriv OAuth app for clientId exactly.
-            const scopes = 'trade+account_manage';
-
-            let oauthUrl = `${hostname}auth?scope=${scopes}&response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${csrfToken}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
-
-            // Optional: prompt parameter (e.g. 'registration' for signup flow)
-            if (prompt) {
-                oauthUrl += `&prompt=${encodeURIComponent(prompt)}`;
-            }
-
-            // Include legacy app_id for intelligent platform routing
-            // According to Deriv OAuth 2.0 docs: "Deriv will check whether the user belongs
-            // to the old or new platform and route them to the appropriate version of your app."
-            // This allows the app to support both:
-            // - New users who use PKCE OAuth (returns access_token)
-            // - Legacy users who have old accounts (returns via legacy OAuth params)
-            // Both token types are then handled appropriately by the app
-            if (appId) {
-                oauthUrl += `&app_id=${encodeURIComponent(appId)}`;
-            }
-
-            return oauthUrl;
-        }
+        const returnPath = `${window.location.pathname}${window.location.hash}`;
+        return await DerivWSAccountsService.createAuthorizationURL(returnPath || '/');
     } catch (error) {
         console.error('Error generating OAuth URL:', error);
     }

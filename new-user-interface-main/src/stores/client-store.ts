@@ -26,12 +26,11 @@ export default class ClientStore {
     is_logged_in = false;
     is_account_regenerating = false;
 
-    accounts: Record<string, TAuthData['account_list'][number]> = {};
+    accounts: Record<string, NonNullable<TAuthData['account_list']>[number]> = {};
     all_accounts_balance: Balance | null = null;
     is_logging_out = false;
 
     private authDataSubscription: { unsubscribe: () => void } | null = null;
-    private root_store: RootStore;
     private tab_visibility_handler: ((event: Event) => void) | null = null;
     private ws_login_id: string | null = null;
     private is_regenerating = false;
@@ -63,8 +62,7 @@ export default class ClientStore {
         }
     };
 
-    constructor(root_store: RootStore) {
-        this.root_store = root_store;
+    constructor(_root_store: RootStore) {
         // Subscribe to auth data changes
         this.authDataSubscription = authData$.subscribe(() => {});
 
@@ -216,13 +214,15 @@ export default class ClientStore {
     };
 
     getCurrency = () => {
-        const clientAccounts = JSON.parse(localStorage.getItem('clientAccounts') ?? '{}');
-        return clientAccounts[this.loginid]?.currency ?? '';
-    };
-
-    getToken = () => {
-        const accountList = JSON.parse(localStorage.getItem('accountsList') ?? '{}');
-        return accountList[this.loginid] ?? '';
+        try {
+            const accounts = JSON.parse(sessionStorage.getItem('deriv_accounts') ?? '[]') as Array<{
+                account_id: string;
+                currency: string;
+            }>;
+            return accounts.find(account => account.account_id === this.loginid)?.currency ?? '';
+        } catch {
+            return '';
+        }
     };
 
     setAllAccountsBalance = (all_accounts_balance: Balance | undefined) => {
@@ -247,14 +247,9 @@ export default class ClientStore {
             const { clearDerivApiInstance } = await import('@/external/bot-skeleton/services/api/appId');
             clearDerivApiInstance();
 
-            // Clear accounts cache from DerivWSAccountsService
+            // Revoke the server-side trader session and clear non-secret account metadata.
             const { DerivWSAccountsService } = await import('@/services/derivws-accounts.service');
-            DerivWSAccountsService.clearStoredAccounts();
-            DerivWSAccountsService.clearCache();
-
-            // Clear OAuth token from sessionStorage
-            const { OAuthTokenExchangeService } = await import('@/services/oauth-token-exchange.service');
-            OAuthTokenExchangeService.clearAuthInfo();
+            await DerivWSAccountsService.logout();
 
             // Reset all the states
             this.account_list = [];
@@ -385,19 +380,10 @@ export default class ClientStore {
 
                 this.all_accounts_balance = null;
 
-                const accountsListRaw = localStorage.getItem('accountsList');
-                if (accountsListRaw) {
-                    try {
-                        const accountsList = JSON.parse(accountsListRaw) as Record<string, string>;
-                        const selectedToken = accountsList[active_login_id];
-                        if (selectedToken) localStorage.setItem('authToken', selectedToken);
-                    } catch (error) {
-                        ErrorLogger.error('ClientStore', 'Failed to preserve legacy account token', error);
-                    }
-                } else {
-                    localStorage.removeItem('authToken');
-                    localStorage.removeItem('clientAccounts');
-                }
+                // The selected account ID is non-secret; its OTP is requested from the BFF.
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('accountsList');
+                localStorage.removeItem('clientAccounts');
                 localStorage.removeItem('account_type');
                 removeCookies('client_information');
 

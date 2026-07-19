@@ -1,5 +1,5 @@
 import { getLocalizedErrorMessage } from '@/constants/backend-error-messages';
-import { getSymbolRequestField, removeUndefinedFields } from '../services/api/legacy-request';
+import { getSymbolRequestField, removeUndefinedFields } from '../services/api/options-request';
 import { api_base } from '../services/api';
 import DBotStore from './dbot-store';
 

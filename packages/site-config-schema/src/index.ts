@@ -1,4 +1,12 @@
 export type RuntimeSiteConfig = {
+    schemaVersion: number;
+    version?: number;
+    generatedAt?: string;
+    tenantId: string;
+    template: {
+        id: string;
+        version: string;
+    };
     site: {
         id: string;
         name: string;
@@ -20,9 +28,9 @@ export type RuntimeSiteConfig = {
     deriv: {
         oauthClientId?: string;
         appId?: string;
-        redirectUri?: string;
-        useLegacyOAuthLogin?: boolean;
-        includeLegacyAppIdInOAuth?: boolean;
+        gatewayUrl: string;
+        requiredScopes?: Array<'trade' | 'account_manage' | 'payment' | 'application_read'>;
+        environment?: 'staging' | 'production';
     };
     features: {
         botIdeas?: boolean;
@@ -47,5 +55,28 @@ export type RuntimeSiteConfig = {
         filePath?: string;
         displayOrder?: number;
         isActive?: boolean;
+    }>;
+    navigation?: Array<{
+        key: string;
+        label: string;
+        slug: string;
+        enabled: boolean;
+        order: number;
+        externalUrl?: string;
+        placement?: 'header' | 'footer' | 'both';
+    }>;
+    legal?: {
+        privacyUrl?: string;
+        termsUrl?: string;
+        riskDisclaimer?: string;
+        disclaimerText?: string;
+    };
+    tools?: Array<{
+        key: string;
+        name: string;
+        enabled: boolean;
+        version: string;
+        displayOrder: number;
+        settings?: Record<string, unknown>;
     }>;
 };

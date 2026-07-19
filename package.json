@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "workspaces": [
     "deriv-sites-ui-kit-main",
-    "repo-push-new-user-interface",
+    "new-user-interface-main",
     "packages/*"
   ],
   "scripts": {
@@ -12,5 +12,25 @@
     "build:admin": "npm run build --workspace deriv-sites-ui-kit-main",
     "dev:trading-web": "npm run start --workspace trading-bot-template",
     "build:trading-web": "npm run build --workspace trading-bot-template"
+  },
+  "overrides": {
+    "glob": "10.5.0",
+    "cross-spawn": "^7.0.6",
+    "braces": "^3.0.3",
+    "@semantic-release/npm": "^13.1.2",
+    "undici": "^6.27.0",
+    "minimatch": "^10.0.3",
+    "picomatch": "^4.0.4",
+    "express": "4.21.2",
+    "ws": "8.21.1",
+    "uuid": "11.1.1",
+    "form-data": "4.0.6",
+    "js-yaml": "4.1.2",
+    "content-type": "1.0.5",
+    "@octokit/request": "10.0.8",
+    "framer-motion": "6.5.1",
+    "hosted-git-info@9.0.3": {
+      "lru-cache": "11.5.0"
+    }
   }
 }

@@ -304,13 +304,19 @@ const handler = async (req: Request): Promise<Response> => {
     // Normalize payload formats (camelCase + snake_case)
     const callback = normalizeCallbackPayload(rawPayload);
     if (!callback) {
-      const keys = (rawPayload && typeof rawPayload === 'object') ? Object.keys(rawPayload as Record<string, unknown>) : [];
-      const dataKeys = (rawPayload && typeof rawPayload === 'object' && (rawPayload as any).data && typeof (rawPayload as any).data === 'object')
-        ? Object.keys((rawPayload as any).data)
+      const payloadRecord = rawPayload && typeof rawPayload === 'object'
+        ? rawPayload as Record<string, unknown>
+        : {};
+      const nestedData = payloadRecord.data && typeof payloadRecord.data === 'object'
+        ? payloadRecord.data as Record<string, unknown>
+        : null;
+      const keys = Object.keys(payloadRecord);
+      const dataKeys = nestedData
+        ? Object.keys(nestedData)
         : [];
 
-      const message = typeof (rawPayload as any)?.message === 'string' ? ((rawPayload as any).message as string) : '';
-      const event = typeof (rawPayload as any)?.event === 'string' ? ((rawPayload as any).event as string) : '';
+      const message = typeof payloadRecord.message === 'string' ? payloadRecord.message : '';
+      const event = typeof payloadRecord.event === 'string' ? payloadRecord.event : '';
 
       // Lipana “Send Test Webhook” appears to send only { event, message, timestamp } (no transaction id).
       // That should still return 200 so Lipana marks the delivery as successful.
@@ -327,10 +333,10 @@ const handler = async (req: Request): Promise<Response> => {
         keys,
         dataKeys,
         hasEvent: !!event,
-        hasStatus: typeof (rawPayload as any)?.status === 'string',
-        hasTransactionId: typeof (rawPayload as any)?.transactionId === 'string',
-        hasTransaction_id: typeof (rawPayload as any)?.transaction_id === 'string',
-        hasPayload: (rawPayload as any)?.payload !== undefined,
+        hasStatus: typeof payloadRecord.status === 'string',
+        hasTransactionId: typeof payloadRecord.transactionId === 'string',
+        hasTransaction_id: typeof payloadRecord.transaction_id === 'string',
+        hasPayload: payloadRecord.payload !== undefined,
         event,
         messagePreview: message.slice(0, 160),
       });
@@ -457,7 +463,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // If this completed purchase is the one-time Full Ownership fee,
+    // If this completed purchase is the one-time setup fee,
     // create (or refresh) a user_subscriptions row so the dashboard can
     // show ownership + 12-month expiry countdown.
     if (
@@ -507,7 +513,7 @@ const handler = async (req: Request): Promise<Response> => {
           if (subInsertError) {
             log('ERROR', 'Failed to create user subscription', { reason: 'sub_insert_error', purchaseId: purchase.id });
           } else {
-            log('INFO', 'Full Ownership subscription created (12 months)', { userId: purchase.user_id });
+            log('INFO', 'One-time setup subscription created (12 months)', { userId: purchase.user_id });
           }
         }
       } catch (subErr) {

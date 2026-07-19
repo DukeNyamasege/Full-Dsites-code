@@ -23,7 +23,7 @@ declare global {
     }
 }
 
-const setSurvicateUserAttributes = (country: string, type: string, creationDate: string) => {
+const setSurvicateUserAttributes = (country = '', type = '', creationDate = '') => {
     if (window.Survicate) {
         if (country) window.Survicate.track('userCountry', country);
         if (type) window.Survicate.track('accountType', type);
@@ -55,11 +55,16 @@ const initSurvicate = () => {
     if (initSurvicateCalled) return;
     setSurvicateCalledValue(true);
     const active_loginid = localStorage.getItem('active_loginid');
-    const client_accounts = JSON.parse(localStorage.getItem('accountsList') as string) || undefined;
+    const accountRows = JSON.parse(sessionStorage.getItem('deriv_accounts') || '[]') as Array<{
+        account_id: string;
+        group?: string;
+        account_type?: string;
+    }>;
+    const client_accounts = Object.fromEntries(accountRows.map(account => [account.account_id, account]));
     const setAttributesIfAvailable = () => {
         if (active_loginid && client_accounts) {
-            const { residence, account_type, created_at } = client_accounts[active_loginid] || {};
-            setSurvicateUserAttributes(residence, account_type, created_at);
+            const { account_type } = client_accounts[active_loginid] || {};
+            setSurvicateUserAttributes('', account_type || '', '');
         }
     };
 

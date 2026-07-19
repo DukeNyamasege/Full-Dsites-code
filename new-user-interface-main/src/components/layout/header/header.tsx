@@ -24,15 +24,6 @@ const AppHeader = observer(() => {
     const [authTimeout, setAuthTimeout] = useState(false);
     const is_account_regenerating = client?.is_account_regenerating || false;
 
-    // Detect OAuth callback on mount (before App.tsx cleans up the URL).
-    // When ?code=...&state=... is present the full auth flow can take 7-15 s
-    // (token exchange → accounts fetch → OTP → WebSocket auth), so we must
-    // suppress the short fallback timeout and keep the spinner throughout.
-    const [isOAuthPending, setIsOAuthPending] = useState(() => {
-        const params = new URLSearchParams(window.location.search);
-        return Boolean(params.get('code') && params.get('state'));
-    });
-
     const { data: activeAccount } = useActiveAccount({
         allBalanceData: client?.all_accounts_balance,
         directBalance: client?.balance,
@@ -40,35 +31,8 @@ const AppHeader = observer(() => {
 
     const handleLogout = useLogout();
 
-    // Clear OAuth-pending flag once the account is set (auth succeeded)
-    // or after a generous timeout in case something goes wrong.
+    // Show the login button if the gateway/socket does not resolve promptly.
     useEffect(() => {
-        if (!isOAuthPending) return;
-
-        if (activeLoginid) {
-            setIsOAuthPending(false);
-            return;
-        }
-
-        // Safety net: give up after 30 s and let the normal flow decide
-        const timer = setTimeout(() => setIsOAuthPending(false), 30_000);
-        return () => clearTimeout(timer);
-    }, [isOAuthPending, activeLoginid]);
-
-    // Handle direct URL access with legacy token param
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const account_id = urlParams.get('account_id');
-        if (account_id) {
-            setIsAuthorizing(true);
-        }
-    }, [setIsAuthorizing]);
-
-    // Fallback timeout: show login button if auth never resolves.
-    // Suppressed during the OAuth callback flow (isOAuthPending = true).
-    useEffect(() => {
-        if (isOAuthPending) return;
-
         const timer = setTimeout(() => {
             if (isAuthorizing && !activeLoginid) {
                 setAuthTimeout(true);
@@ -82,7 +46,7 @@ const AppHeader = observer(() => {
         }
 
         return () => clearTimeout(timer);
-    }, [isAuthorizing, activeLoginid, setIsAuthorizing, authTimeout, isOAuthPending]);
+    }, [isAuthorizing, activeLoginid, setIsAuthorizing, authTimeout]);
 
     const handleSignup = useCallback(async () => {
         try {
@@ -105,7 +69,7 @@ const AppHeader = observer(() => {
             // Set authorizing state immediately when login is clicked
             setIsAuthorizing(true);
 
-            // Generate OAuth URL with CSRF token and PKCE parameters
+            // The server creates state and PKCE parameters; this client receives only the authorization URL.
             const oauthUrl = await generateOAuthURL();
 
             if (oauthUrl) {

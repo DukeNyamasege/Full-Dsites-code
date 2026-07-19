@@ -1,6 +1,5 @@
 import React from 'react';
 import { action, computed, makeObservable, observable, reaction } from 'mobx';
-import { v4 as uuidv4 } from 'uuid';
 import {
     getSavedWorkspaces,
     load,
@@ -168,7 +167,7 @@ export default class LoadModalStore {
         if (result === 'not_verified') return;
 
         if (google_drive) {
-            google_drive.upload_id = uuidv4();
+            google_drive.upload_id = crypto.randomUUID();
         }
 
         /* [AI] - Analytics event tracking removed - see migrate-docs/MONITORING_PACKAGES.md for re-implementation guide */
@@ -403,7 +402,7 @@ export default class LoadModalStore {
         is_body = true
     ): boolean => {
         this.imported_strategy_type = 'pending';
-        this.upload_id = uuidv4();
+        this.upload_id = crypto.randomUUID();
         let files;
         if (event.type === 'drop') {
             event.stopPropagation();

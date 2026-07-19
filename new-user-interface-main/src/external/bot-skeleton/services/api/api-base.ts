@@ -18,7 +18,7 @@ import {
     setIsAuthorizing,
 } from './observables/connection-status-stream';
 import ApiHelpers from './api-helpers';
-import { generateDerivApiInstance, V2GetActiveAccountId, getToken } from './appId';
+import { generateDerivApiInstance, V2GetActiveAccountId } from './appId';
 import chart_api from './chart-api';
 
 type CurrentSubscription = {
@@ -38,7 +38,6 @@ type TApiBaseApi = {
     };
     send: (data: unknown) => void;
     disconnect: () => void;
-    authorize: (token: string) => Promise<{ authorize: TAuthData; error: unknown }>;
 
     onMessage: () => {
         subscribe: (callback: (message: unknown) => void) => {
@@ -152,10 +151,6 @@ class APIBase {
                 console.error('[handleTokenExchangeIfNeeded] Error reading accounts from sessionStorage:', error);
             }
         }
-
-        // Check for legacy token in localStorage
-        const accountsList = localStorage.getItem('accountsList');
-        console.log('[handleTokenExchangeIfNeeded] Legacy accountsList present:', !!accountsList);
 
         // Now proceed with normal authorization if we have an account_id
         if (activeAccountId) {
@@ -289,43 +284,6 @@ class APIBase {
         }
     };
 
-    private getLegacyAccountList(balance?: any, allBalance?: any): TAuthData['account_list'] {
-        const accountsListRaw = localStorage.getItem('accountsList');
-        const clientAccountsRaw = localStorage.getItem('clientAccounts');
-
-        if (!accountsListRaw) return [];
-
-        try {
-            const accountsList = JSON.parse(accountsListRaw) as Record<string, string>;
-            const clientAccounts = clientAccountsRaw
-                ? (JSON.parse(clientAccountsRaw) as Record<string, { currency?: string; token?: string }>)
-                : {};
-            const allBalanceAccounts = allBalance?.accounts || {};
-
-            return Object.keys(accountsList).map(loginid => {
-                const accountBalance = allBalanceAccounts[loginid];
-                const amount =
-                    typeof accountBalance === 'number'
-                        ? accountBalance
-                        : Number(accountBalance?.balance ?? (loginid === balance?.loginid ? balance?.balance : 0));
-                const currency =
-                    accountBalance?.currency ||
-                    clientAccounts[loginid]?.currency ||
-                    (loginid === balance?.loginid ? balance?.currency : 'USD');
-
-                return {
-                    balance: Number.isFinite(amount) ? amount : 0,
-                    currency,
-                    is_virtual: isDemoAccount(loginid) ? 1 : 0,
-                    loginid,
-                };
-            });
-        } catch (error) {
-            console.error('[authorizeAndSubscribe] Error building legacy account list:', error);
-            return [];
-        }
-    }
-
     async authorizeAndSubscribe() {
         if (!this.api) return;
 
@@ -333,72 +291,15 @@ class APIBase {
         setIsAuthorizing(true);
 
         try {
-            // Get the stored token for legacy API authentication
-            const { token: storedToken, account_id: accountId } = getToken();
-
-            console.log('[authorizeAndSubscribe] ⚙️ Starting authorization flow:', {
-                has_token: !!storedToken,
-                token_type: typeof storedToken,
-                token_length: storedToken ? storedToken.length : 0,
-                token_first_10_chars: storedToken ? storedToken.substring(0, 10) : 'N/A',
-                accountId,
-                api_ready: !!this.api,
-                ws_ready_state: this.api?.connection?.readyState,
-            });
-
-            // Authorize with the token first (required for legacy API)
-            if (storedToken) {
-                try {
-                    console.log('[authorizeAndSubscribe] 🔐 Calling api.authorize() with legacy token...');
-                    const authResult = await this.api.authorize(storedToken);
-
-                    console.log('[authorizeAndSubscribe] 📨 api.authorize() raw result:', authResult);
-
-                    const { authorize, error: authError } = authResult as any;
-
-                    console.log('[authorizeAndSubscribe] 📨 api.authorize() parsed response:', {
-                        has_authorize: !!authorize,
-                        authorize_loginid: authorize?.loginid,
-                        authorize_email: authorize?.email,
-                        has_error: !!authError,
-                        error_code: (authError as any)?.code,
-                        error_message: (authError as any)?.message,
-                        error_full: authError,
-                    });
-
-                    if (authError) {
-                        const errorMessage = isBackendError(authError)
-                            ? handleBackendError(authError)
-                            : (authError as any)?.message || 'Authorization failed';
-
-                        console.error('❌ [authorizeAndSubscribe] Token authorization error:', {
-                            message: errorMessage,
-                            error_code: (authError as any)?.code,
-                            token_was: storedToken ? `Present (${storedToken.length} chars)` : 'MISSING',
-                        });
-                        setIsAuthorizing(false);
-                        return { ...authError, localizedMessage: errorMessage };
-                    }
-                    console.log('✅ [authorizeAndSubscribe] Authorization successful!');
-                } catch (authException: any) {
-                    console.error('❌ [authorizeAndSubscribe] Exception during api.authorize():', {
-                        exception_message: authException?.message,
-                        exception_type: authException?.constructor?.name,
-                        exception_full: authException,
-                    });
-                    setIsAuthorizing(false);
-                    return { error: authException, localizedMessage: 'Authorization exception' };
-                }
-            } else {
-                console.warn('⚠️ [authorizeAndSubscribe] No token available for authorization', {
-                    active_loginid: accountId,
-                    accountsList: localStorage.getItem('accountsList') ? 'Present' : 'MISSING',
-                });
+            const accountId = getAccountId() || undefined;
+            if (!accountId) {
+                setIsAuthorizing(false);
+                return { error: { code: 'AccountMissing' }, localizedMessage: 'Select a Deriv Options account.' };
             }
 
-            // Now fetch balance after successful authorization
+            // The account-specific OTP URL authenticated this WebSocket before it opened.
             console.log('[authorizeAndSubscribe] Calling api.balance()...');
-            let balance, error, allBalance;
+            let balance, error;
             try {
                 const balanceResult = await (this.api as any).balance();
                 balance = balanceResult?.balance;
@@ -406,22 +307,6 @@ class APIBase {
 
                 console.log('[authorizeAndSubscribe] api.balance() raw result:', balanceResult);
 
-                const hasLegacyAccounts = !!localStorage.getItem('accountsList');
-                if (hasLegacyAccounts) {
-                    try {
-                        const allBalanceResult = await (this.api as any).balance({ account: 'all' });
-                        allBalance = allBalanceResult?.balance;
-                        console.log(
-                            '[authorizeAndSubscribe] api.balance({ account: all }) raw result:',
-                            allBalanceResult
-                        );
-                    } catch (allBalanceError) {
-                        console.warn(
-                            '[authorizeAndSubscribe] Could not fetch all legacy account balances:',
-                            allBalanceError
-                        );
-                    }
-                }
             } catch (balanceException: any) {
                 console.error('❌ [authorizeAndSubscribe] Exception during api.balance():', {
                     exception_message: balanceException?.message,
@@ -470,24 +355,19 @@ class APIBase {
                   }
                 : null;
 
-            // Build full account list from sessionStorage (PKCE flow) or localStorage (legacy flow).
-            // Legacy OAuth redirects provide all login IDs/tokens in `accountsList` and `clientAccounts`,
-            // so use those to keep the dropdown populated with every available real/demo account.
+            // Build the account switcher from non-secret account metadata returned by the BFF.
             const storedAccounts = DerivWSAccountsService.getStoredAccounts();
-            const legacyAccountList = this.getLegacyAccountList(balance, allBalance);
             const accountList =
-                legacyAccountList.length > 0
-                    ? legacyAccountList
-                    : storedAccounts && storedAccounts.length > 0
+                storedAccounts && storedAccounts.length > 0
                       ? storedAccounts
                             .filter(a => !a.status || a.status === 'active')
                             .map(a => ({
-                                balance: parseFloat(a.balance) || 0,
+                                balance: Number(a.balance) || 0,
                                 currency: a.currency || 'USD',
                                 is_virtual: a.account_type === 'demo' ? 1 : 0,
                                 loginid: a.account_id,
                             }))
-                      : currentAccount
+                    : currentAccount
                         ? [currentAccount]
                         : [];
 

@@ -236,7 +236,6 @@ export type Database = {
           created_at: string
           deleted_bot_name: string | null
           deriv_affiliate_id: string | null
-          deriv_api_token: string | null
           domain_id: string | null
           id: string
           name: string
@@ -249,7 +248,6 @@ export type Database = {
           created_at?: string
           deleted_bot_name?: string | null
           deriv_affiliate_id?: string | null
-          deriv_api_token?: string | null
           domain_id?: string | null
           id?: string
           name: string
@@ -262,7 +260,6 @@ export type Database = {
           created_at?: string
           deleted_bot_name?: string | null
           deriv_affiliate_id?: string | null
-          deriv_api_token?: string | null
           domain_id?: string | null
           id?: string
           name?: string
@@ -566,6 +563,223 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tools: {
+        Row: {
+          category: string
+          configuration_schema: Json
+          created_at: string
+          current_version: string
+          default_settings: Json
+          description: string | null
+          icon: string | null
+          id: string
+          key: string
+          minimum_plan: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          configuration_schema?: Json
+          current_version?: string
+          default_settings?: Json
+          description?: string | null
+          icon?: string | null
+          id?: string
+          key: string
+          minimum_plan?: string
+          name: string
+          status?: string
+        }
+        Update: {
+          category?: string
+          configuration_schema?: Json
+          current_version?: string
+          default_settings?: Json
+          description?: string | null
+          icon?: string | null
+          key?: string
+          minimum_plan?: string
+          name?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      site_deployments: {
+        Row: {
+          commit_message: string | null
+          commit_sha: string | null
+          commit_url: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          netlify_deploy_id: string | null
+          netlify_deploy_url: string | null
+          netlify_log_url: string | null
+          deploy_context: string | null
+          provider: string
+          publish_version_id: string | null
+          repository_branch: string | null
+          repository_name: string | null
+          repository_owner: string | null
+          repository_path: string | null
+          requested_by: string | null
+          retry_of: string | null
+          rollback_of: string | null
+          site_id: string
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commit_message?: string | null
+          commit_sha?: string | null
+          commit_url?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          netlify_deploy_id?: string | null
+          netlify_deploy_url?: string | null
+          netlify_log_url?: string | null
+          deploy_context?: string | null
+          provider?: string
+          publish_version_id?: string | null
+          repository_branch?: string | null
+          repository_name?: string | null
+          repository_owner?: string | null
+          repository_path?: string | null
+          requested_by?: string | null
+          retry_of?: string | null
+          rollback_of?: string | null
+          site_id: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commit_message?: string | null
+          commit_sha?: string | null
+          commit_url?: string | null
+          completed_at?: string | null
+          error_message?: string | null
+          metadata?: Json
+          netlify_deploy_id?: string | null
+          netlify_deploy_url?: string | null
+          netlify_log_url?: string | null
+          deploy_context?: string | null
+          repository_branch?: string | null
+          repository_name?: string | null
+          repository_owner?: string | null
+          repository_path?: string | null
+          retry_of?: string | null
+          rollback_of?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_deployments_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_deployments_publish_version_id_fkey"
+            columns: ["publish_version_id"]
+            isOneToOne: false
+            referencedRelation: "site_publish_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_integrations: {
+        Row: {
+          created_at: string
+          github_config_root: string
+          github_default_branch: string
+          github_installation_id: number | null
+          github_repository_name: string | null
+          github_repository_owner: string | null
+          id: string
+          last_error: string | null
+          netlify_account_id: string | null
+          netlify_admin_url: string | null
+          netlify_build_hook_url: string | null
+          netlify_site_id: string | null
+          netlify_site_name: string | null
+          netlify_site_url: string | null
+          site_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          github_config_root?: string
+          github_default_branch?: string
+          github_installation_id?: number | null
+          github_repository_name?: string | null
+          github_repository_owner?: string | null
+          last_error?: string | null
+          netlify_account_id?: string | null
+          netlify_admin_url?: string | null
+          netlify_build_hook_url?: string | null
+          netlify_site_id?: string | null
+          netlify_site_name?: string | null
+          netlify_site_url?: string | null
+          site_id: string
+          status?: string
+        }
+        Update: {
+          github_config_root?: string
+          github_default_branch?: string
+          github_installation_id?: number | null
+          github_repository_name?: string | null
+          github_repository_owner?: string | null
+          last_error?: string | null
+          netlify_account_id?: string | null
+          netlify_admin_url?: string | null
+          netlify_build_hook_url?: string | null
+          netlify_site_id?: string | null
+          netlify_site_name?: string | null
+          netlify_site_url?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      site_tools: {
+        Row: {
+          created_at: string
+          display_order: number
+          enabled: boolean
+          id: string
+          settings_json: Json
+          site_id: string
+          tool_id: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          display_order?: number
+          enabled?: boolean
+          id?: string
+          settings_json?: Json
+          site_id: string
+          tool_id: string
+          version?: string
+        }
+        Update: {
+          display_order?: number
+          enabled?: boolean
+          settings_json?: Json
+          version?: string
+        }
+        Relationships: []
       }
       site_settings: {
         Row: {

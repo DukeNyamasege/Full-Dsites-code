@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Shield, Globe, CheckCircle2, Clock, RefreshCw, ExternalLink, Bot, Key, Download, FileCode, ChevronDown, ChevronUp, MessageSquare, Send, Trash2, Plus, MinusCircle, Sparkles, DollarSign, TrendingUp, Percent, BarChart3 } from "lucide-react";
+import { Shield, Globe, CheckCircle2, Clock, RefreshCw, ExternalLink, Bot, Key, Download, FileCode, ChevronDown, ChevronUp, MessageSquare, Send, Trash2, Plus, MinusCircle, Sparkles, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminRole } from "@/hooks/useAdminRole";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useAdminCommissions } from "@/hooks/useAdminCommissions";
+import AdminMarkupStats from "@/components/AdminMarkupStats";
 interface XmlBot {
   id: string;
   file_name: string;
@@ -22,7 +22,6 @@ interface Site {
   name: string;
   status: string;
   deriv_affiliate_id: string | null;
-  deriv_api_token: string | null;
   pending_reason: string | null;
   deleted_bot_name: string | null;
   created_at: string;
@@ -59,112 +58,10 @@ interface SupportMessage {
   created_at: string;
 }
 
-// Admin Commission Stats Component
-const AdminCommissionStats = ({ isAdmin }: { isAdmin: boolean }) => {
-  const { data: commissions, isLoading, refetch } = useAdminCommissions(isAdmin);
-
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/10 animate-pulse">
-            <div className="h-4 w-20 bg-white/10 rounded mb-2" />
-            <div className="h-8 w-24 bg-white/10 rounded" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4 mt-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-primary" />
-          Commission Overview (All Sites)
-        </h3>
-        <Button onClick={() => refetch()} variant="ghost" size="sm">
-          <RefreshCw className="w-4 h-4" />
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Today's Commissions */}
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm text-muted-foreground">Today</span>
-          </div>
-          <p className="text-2xl font-bold text-foreground">
-            ${commissions?.todayCommissions?.toFixed(2) || '0.00'}
-          </p>
-        </div>
-
-        {/* This Month */}
-        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-4 h-4 text-blue-400" />
-            <span className="text-sm text-muted-foreground">This Month</span>
-          </div>
-          <p className="text-2xl font-bold text-foreground">
-            ${commissions?.monthCommissions?.toFixed(2) || '0.00'}
-          </p>
-        </div>
-
-        {/* Developer Share Today */}
-        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <Percent className="w-4 h-4 text-purple-400" />
-            <span className="text-sm text-muted-foreground">8% Today</span>
-          </div>
-          <p className="text-2xl font-bold text-foreground">
-            ${commissions?.todayDeveloperShare?.toFixed(2) || '0.00'}
-          </p>
-        </div>
-
-        {/* Developer Share Month */}
-        <div className="p-4 rounded-xl bg-pink-500/10 border border-pink-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <Percent className="w-4 h-4 text-pink-400" />
-            <span className="text-sm text-muted-foreground">8% This Month</span>
-          </div>
-          <p className="text-2xl font-bold text-foreground">
-            ${commissions?.monthDeveloperShare?.toFixed(2) || '0.00'}
-          </p>
-        </div>
-      </div>
-
-      {/* Site Breakdown */}
-      {commissions?.siteBreakdown && commissions.siteBreakdown.length > 0 && (
-        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-          <h4 className="text-sm font-medium text-muted-foreground mb-3">Site Breakdown</h4>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {commissions.siteBreakdown.map((site, idx) => (
-              <div key={idx} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                <span className="text-sm text-foreground">{site.siteName}</span>
-                <div className="flex gap-4 text-sm">
-                  <span className="text-emerald-400">Today: ${site.todayCommissions.toFixed(2)}</span>
-                  <span className="text-blue-400">Month: ${site.monthCommissions.toFixed(2)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {commissions?.lastUpdated && (
-        <p className="text-xs text-muted-foreground text-right">
-          Last updated: {new Date(commissions.lastUpdated).toLocaleString()}
-        </p>
-      )}
-    </div>
-  );
-};
-
 const Admin = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isAdmin, loading: adminLoading } = useAdminRole();
+  const { isAdmin, role, canManageSites, canSupport, canViewFinance, loading: adminLoading } = useAdminRole();
   const queryClient = useQueryClient();
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set());
@@ -208,7 +105,7 @@ const Admin = () => {
         profiles: profilesMap.get(site.user_id) || null,
       })) as unknown as Site[];
     },
-    enabled: isAdmin,
+    enabled: canManageSites,
   });
 
   // Fetch support tickets
@@ -226,7 +123,7 @@ const Admin = () => {
       if (error) throw error;
       return data as unknown as SupportTicket[];
     },
-    enabled: isAdmin,
+    enabled: canSupport,
   });
 
   // Fetch messages for selected ticket
@@ -243,12 +140,12 @@ const Admin = () => {
       if (error) throw error;
       return data as SupportMessage[];
     },
-    enabled: !!selectedTicket?.id,
+    enabled: canSupport && !!selectedTicket?.id,
   });
 
   // Real-time subscription for sites
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canManageSites) return;
 
     const channel = supabase
       .channel('admin-sites-realtime')
@@ -269,11 +166,11 @@ const Admin = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin, queryClient]);
+  }, [canManageSites, queryClient]);
 
   // Real-time subscription for new tickets
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canSupport) return;
 
     const channel = supabase
       .channel('admin-tickets')
@@ -293,11 +190,11 @@ const Admin = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin, queryClient]);
+  }, [canSupport, queryClient]);
 
   // Real-time subscription for messages on selected ticket
   useEffect(() => {
-    if (!selectedTicket?.id) return;
+    if (!canSupport || !selectedTicket?.id) return;
 
     const channel = supabase
       .channel(`admin-ticket-${selectedTicket.id}`)
@@ -318,7 +215,7 @@ const Admin = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedTicket?.id, queryClient]);
+  }, [canSupport, selectedTicket?.id, queryClient]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -568,18 +465,18 @@ const Admin = () => {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Admin Panel</h1>
-            <p className="text-muted-foreground text-sm">Manage site deployments & support</p>
+            <p className="text-muted-foreground text-sm">Role: {role?.replace(/_/g, " ")}</p>
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="sites" className="space-y-4">
+      <Tabs defaultValue={canManageSites ? "sites" : canSupport ? "support" : "finance"} className="space-y-4">
         <TabsList className="bg-white/5 border border-white/10">
-          <TabsTrigger value="sites" className="data-[state=active]:bg-white/10">
+          {canManageSites && <TabsTrigger value="sites" className="data-[state=active]:bg-white/10">
             <Globe className="w-4 h-4 mr-2" />
             Sites
-          </TabsTrigger>
-          <TabsTrigger value="support" className="data-[state=active]:bg-white/10">
+          </TabsTrigger>}
+          {canSupport && <TabsTrigger value="support" className="data-[state=active]:bg-white/10">
             <MessageSquare className="w-4 h-4 mr-2" />
             Support
             {activeTickets.length > 0 && (
@@ -587,11 +484,14 @@ const Admin = () => {
                 {activeTickets.length}
               </span>
             )}
-          </TabsTrigger>
+          </TabsTrigger>}
+          {canViewFinance && <TabsTrigger value="finance" className="data-[state=active]:bg-white/10">
+            Markup
+          </TabsTrigger>}
         </TabsList>
 
         {/* Sites Tab */}
-        <TabsContent value="sites" className="space-y-6">
+        {canManageSites && <TabsContent value="sites" className="space-y-6">
           <div className="flex justify-end">
             <Button onClick={() => refetch()} variant="outline" size="sm">
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -623,9 +523,6 @@ const Admin = () => {
               <p className="text-2xl font-bold text-foreground">{activeSites.length}</p>
             </div>
           </div>
-
-          {/* Commission Stats */}
-          <AdminCommissionStats isAdmin={isAdmin} />
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -714,10 +611,10 @@ const Admin = () => {
               )}
             </div>
           )}
-        </TabsContent>
+        </TabsContent>}
 
         {/* Support Tab */}
-        <TabsContent value="support" className="space-y-4">
+        {canSupport && <TabsContent value="support" className="space-y-4">
           <div className="flex justify-end">
             <Button onClick={() => refetchTickets()} variant="outline" size="sm">
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -921,7 +818,11 @@ const Admin = () => {
               )}
             </div>
           </div>
-        </TabsContent>
+        </TabsContent>}
+
+        {canViewFinance && <TabsContent value="finance" className="space-y-4">
+          <AdminMarkupStats enabled={canViewFinance} />
+        </TabsContent>}
       </Tabs>
     </div>
   );
@@ -970,13 +871,6 @@ const SiteCard = ({ site, getStatusBadge, onActivate, isActivating, isLive, isEx
                 </div>
               )}
               
-              {site.deriv_api_token && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Key className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="font-mono text-xs bg-amber-500/10 px-2 py-0.5 rounded">Token: {site.deriv_api_token}</span>
-                </div>
-              )}
-              
               <button 
                 onClick={onToggleExpand}
                 className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -998,7 +892,7 @@ const SiteCard = ({ site, getStatusBadge, onActivate, isActivating, isLive, isEx
 
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link to={`/sites/${site.id}/config`}>
+              <Link to={`/sites/${site.id}/wizard`}>
                 <Settings className="w-4 h-4 mr-1" />
                 Config
               </Link>

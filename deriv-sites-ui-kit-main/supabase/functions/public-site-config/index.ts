@@ -9,6 +9,9 @@ const corsHeaders = {
 
 type JsonRecord = Record<string, string>;
 type RuntimeSiteConfigResponse = {
+  schemaVersion: number;
+  tenantId: string;
+  template: { id: string; version: string };
   site: {
     id: string;
     name: string;
@@ -30,9 +33,9 @@ type RuntimeSiteConfigResponse = {
   deriv: {
     oauthClientId?: string;
     appId?: string;
-    redirectUri?: string;
-    useLegacyOAuthLogin?: boolean;
-    includeLegacyAppIdInOAuth?: boolean;
+    gatewayUrl: string;
+    requiredScopes: string[];
+    environment: "production" | "staging";
   };
   features: {
     botIdeas?: boolean;
@@ -57,6 +60,16 @@ type RuntimeSiteConfigResponse = {
     filePath?: string;
     displayOrder?: number;
     isActive?: boolean;
+  }>;
+  navigation?: Array<{ key: string; label: string; slug: string; enabled: boolean; order: number }>;
+  legal?: { privacyUrl?: string; termsUrl?: string; riskDisclaimer?: string; disclaimerText?: string };
+  tools?: Array<{
+    key: string;
+    name: string;
+    enabled: boolean;
+    version: string;
+    displayOrder: number;
+    settings?: Record<string, unknown>;
   }>;
 };
 
@@ -92,8 +105,35 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const tryBuildResponseFromSnapshot = (
   snapshot: unknown,
   fallbackHostname: string,
+  fallbackTenantId: string,
+  gatewayUrl: string,
 ): RuntimeSiteConfigResponse | null => {
   if (!isObject(snapshot)) return null;
+
+  // New publisher snapshots already use the frontend-safe runtime contract.
+  if (isObject(snapshot.site) && isObject(snapshot.branding) && isObject(snapshot.deriv)) {
+    const direct = snapshot as unknown as RuntimeSiteConfigResponse;
+    return {
+      ...direct,
+      schemaVersion: direct.schemaVersion || 1,
+      tenantId: direct.tenantId || fallbackTenantId,
+      template: direct.template || { id: "deriv-bot", version: "1.0.0" },
+      site: {
+        ...direct.site,
+        hostname: direct.site.hostname || fallbackHostname,
+      },
+      features: direct.features || {},
+      deriv: {
+        ...direct.deriv,
+        gatewayUrl,
+        requiredScopes: direct.deriv.requiredScopes || ["trade"],
+        environment: direct.deriv.environment || "production",
+      },
+      pages: Array.isArray(direct.pages) ? direct.pages : [],
+      bots: Array.isArray(direct.bots) ? direct.bots : [],
+      tools: Array.isArray(direct.tools) ? direct.tools : [],
+    };
+  }
 
   const site = isObject(snapshot.site) ? snapshot.site : null;
   const settings = isObject(snapshot.settings) ? snapshot.settings : null;
@@ -111,6 +151,9 @@ const tryBuildResponseFromSnapshot = (
       : undefined;
 
   return {
+    schemaVersion: 1,
+    tenantId: fallbackTenantId,
+    template: { id: "deriv-bot", version: "1.0.0" },
     site: {
       id: typeof site.id === "string" ? site.id : "",
       name:
@@ -139,15 +182,9 @@ const tryBuildResponseFromSnapshot = (
     deriv: {
       oauthClientId: derivApp && typeof derivApp.oauth_client_id === "string" ? derivApp.oauth_client_id : undefined,
       appId: derivApp && typeof derivApp.deriv_app_id === "string" ? derivApp.deriv_app_id : undefined,
-      redirectUri: derivApp && typeof derivApp.redirect_uri === "string" ? derivApp.redirect_uri : undefined,
-      useLegacyOAuthLogin:
-        derivApp && typeof derivApp.use_legacy_oauth_login === "boolean"
-          ? derivApp.use_legacy_oauth_login
-          : undefined,
-      includeLegacyAppIdInOAuth:
-        derivApp && typeof derivApp.include_legacy_app_id_in_oauth === "boolean"
-          ? derivApp.include_legacy_app_id_in_oauth
-          : undefined,
+      gatewayUrl,
+      requiredScopes: ["trade"],
+      environment: "production",
     },
     features: {
       botIdeas: features && typeof features.bot_ideas === "boolean" ? features.bot_ideas : undefined,
@@ -234,7 +271,7 @@ serve(async req => {
 
     const { data: site, error: siteError } = await supabaseAdmin
       .from("sites")
-      .select("id, name, status")
+      .select("id, name, status, organisation_id, active_template_version")
       .eq("id", domainRecord.site_id)
       .eq("status", "active")
       .maybeSingle();
@@ -266,13 +303,15 @@ serve(async req => {
     const snapshotResponse = tryBuildResponseFromSnapshot(
       latestPublishedSnapshot?.config_snapshot_json,
       domainRecord.hostname,
+      site.organisation_id,
+      "/api",
     );
 
     if (snapshotResponse) {
       return json(snapshotResponse);
     }
 
-    const [settingsResult, featuresResult, pagesResult, derivResult, botsResult] = await Promise.all([
+    const [settingsResult, featuresResult, pagesResult, derivResult, botsResult, toolsResult] = await Promise.all([
       supabaseAdmin
         .from("site_settings")
         .select("site_name, brand_name, logo_url, favicon_url, primary_color, secondary_color, accent_color, header_bg_color, header_text_color, custom_css_vars_json")
@@ -299,6 +338,11 @@ serve(async req => {
         .eq("site_id", site.id)
         .eq("is_active", true)
         .order("display_order", { ascending: true }),
+      supabaseAdmin
+        .from("site_tools")
+        .select("enabled, version, display_order, settings_json, tool:tools(key, name)")
+        .eq("site_id", site.id)
+        .order("display_order", { ascending: true }),
     ]);
 
     const queryError =
@@ -306,7 +350,8 @@ serve(async req => {
       featuresResult.error ||
       pagesResult.error ||
       derivResult.error ||
-      botsResult.error;
+      botsResult.error ||
+      toolsResult.error;
 
     if (queryError) {
       console.error("public-site-config config lookup error", queryError);
@@ -318,6 +363,7 @@ serve(async req => {
     const pages = pagesResult.data ?? [];
     const deriv = derivResult.data;
     const bots = botsResult.data ?? [];
+    const tools = toolsResult.data ?? [];
     const customCssVars =
       settings?.custom_css_vars_json &&
       typeof settings.custom_css_vars_json === "object" &&
@@ -326,6 +372,9 @@ serve(async req => {
         : undefined;
 
     return json({
+      schemaVersion: 1,
+      tenantId: site.organisation_id,
+      template: { id: "deriv-bot", version: site.active_template_version || "1.0.0" },
       site: {
         id: site.id,
         name: settings?.site_name || site.name,
@@ -347,9 +396,9 @@ serve(async req => {
       deriv: {
         oauthClientId: deriv?.oauth_client_id || undefined,
         appId: deriv?.deriv_app_id || undefined,
-        redirectUri: deriv?.redirect_uri || undefined,
-        useLegacyOAuthLogin: deriv?.use_legacy_oauth_login || undefined,
-        includeLegacyAppIdInOAuth: deriv?.include_legacy_app_id_in_oauth || undefined,
+        gatewayUrl: "/api",
+        requiredScopes: ["trade"],
+        environment: "production",
       },
       features: {
         botIdeas: features?.bot_ideas ?? undefined,
@@ -374,6 +423,14 @@ serve(async req => {
         filePath: bot.file_path || undefined,
         displayOrder: bot.display_order ?? undefined,
         isActive: bot.is_active,
+      })),
+      tools: tools.map(siteTool => ({
+        key: siteTool.tool.key,
+        name: siteTool.tool.name,
+        enabled: siteTool.enabled,
+        version: siteTool.version,
+        displayOrder: siteTool.display_order,
+        settings: siteTool.settings_json || {},
       })),
     });
   } catch (error: unknown) {

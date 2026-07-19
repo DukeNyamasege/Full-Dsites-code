@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { setSessionToken as setSessionTokenUtil } from '@/utils/session-token-utils';
+import { useEffect, useState } from 'react';
 import { useStore } from './useStore';
 
 /**
@@ -19,7 +18,6 @@ import { useStore } from './useStore';
  * - Changes made by the current tab will not trigger a refresh
  */
 export const useLocalStorageSync = () => {
-    const isOwnChange = useRef(false);
     const store = useStore();
     const [showAccountChangeModal, setShowAccountChangeModal] = useState(false);
 
@@ -40,8 +38,8 @@ export const useLocalStorageSync = () => {
 
     useEffect(() => {
         const handleStorageChange = (event: StorageEvent) => {
-            // Only handle session_token changes
-            if (event.key !== 'session_token') {
+            // Account identifiers are non-secret and synchronize selection across tabs.
+            if (event.key !== 'active_loginid') {
                 return;
             }
 
@@ -63,24 +61,7 @@ export const useLocalStorageSync = () => {
         };
     }, [store?.run_panel?.is_running, store?.ui]);
 
-    /**
-     * Wrapper function to set session_token in localStorage and cookies
-     * This prevents the storage event from firing on the current tab
-     *
-     * @param token - The session token to store
-     */
-    const setSessionToken = (token: string) => {
-        isOwnChange.current = true;
-        setSessionTokenUtil(token);
-
-        // Reset the flag after a short delay
-        setTimeout(() => {
-            isOwnChange.current = false;
-        }, 50);
-    };
-
     return {
-        setSessionToken,
         showAccountChangeModal,
         handleReload,
         handleModalClose,

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -14,14 +14,11 @@ import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
-import SetupAppId from "./pages/SetupAppId";
-import SetupToken from "./pages/SetupToken";
-import SetupBots from "./pages/SetupBots";
-import SetupSummary from "./pages/SetupSummary";
 import Admin from "./pages/Admin";
 import Support from "./pages/Support";
 import ApiPlatforms from "./pages/ApiPlatforms";
 import SiteRuntimeConfig from "./pages/SiteRuntimeConfig";
+import SiteWizard from "./pages/SiteWizard";
 import Sidebar from "./components/Sidebar";
 import MobileNav from "./components/MobileNav";
 
@@ -54,12 +51,10 @@ const App = () => (
                         <Route path="/settings" element={<Settings />} />
                         <Route path="/support" element={<Support />} />
                         <Route path="/api-platforms" element={<ApiPlatforms />} />
-                        <Route path="/setup/app-id" element={<SetupAppId />} />
-                        <Route path="/setup/token" element={<SetupToken />} />
-                        <Route path="/setup/bots" element={<SetupBots />} />
-                        <Route path="/setup/summary" element={<SetupSummary />} />
+                        <Route path="/setup/*" element={<Navigate to="/domains" replace />} />
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/sites/:siteId/config" element={<SiteRuntimeConfig />} />
+                        <Route path="/sites/:siteId/wizard" element={<SiteWizard />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </main>
